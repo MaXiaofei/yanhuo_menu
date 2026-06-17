@@ -2,10 +2,13 @@ package com.yanhuo.xsd.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+import java.io.File;
+
 /**
- * CORS 配置：允许 Vite 开发服务器 (5173) 跨域，含 Authorization 头。
+ * CORS + 静态资源映射（上传的图片 /uploads/**）。
  */
 @Configuration
 public class CorsConfig implements WebMvcConfigurer {
@@ -17,5 +20,11 @@ public class CorsConfig implements WebMvcConfigurer {
                 .allowedHeaders("*")
                 .allowedMethods("*")
                 .allowCredentials(true);
+    }
+
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        String location = new File("uploads").getAbsolutePath() + File.separator;
+        registry.addResourceHandler("/uploads/**").addResourceLocations("file:" + location);
     }
 }

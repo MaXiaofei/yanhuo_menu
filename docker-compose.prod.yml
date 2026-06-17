@@ -1,0 +1,46 @@
+# 烟火小食单 · 全栈一键部署
+# 用法：docker compose -f docker-compose.prod.yml up -d --build
+# 访问：http://<host>   登录 admin / admin123
+# 注：根目录 docker-compose.yml 是「开发 DB」（mysql/redis/minio 端口映射，本机开发连）；
+#     本文件是「全栈部署」（含后端前端，内部网络，仅前端 80 对外）。
+services:
+  yanhuo-mysql:
+    image: mysql:8.0
+    container_name: yanhuo-mysql-prod
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: MYSQL_PWD_REDACTED
+      MYSQL_DATABASE: yanhuo
+      TZ: Asia/Shanghai
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./menu-api/sql:/docker-entrypoint-initdb.d:ro   # 首启自动建表+灌种子(V1..V11)
+
+  yanhuo-redis:
+    image: redis:7
+    container_name: yanhuo-redis-prod
+    restart: unless-stopped
+
+  menu-api:
+    build: ./menu-api
+    container_name: menu-api
+    restart: unless-stopped
+    depends_on: [yanhuo-mysql, yanhuo-redis]
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      TZ: Asia/Shanghai
+    volumes:
+      - uploads:/app/uploads
+
+  menu-admin:
+    build: ./menu-admin
+    container_name: menu-admin
+    restart: unless-stopped
+    depends_on: [menu-api]
+    ports:
+      - "80:80"
+
+volumes:
+  mysql-data:
+  uploads:
