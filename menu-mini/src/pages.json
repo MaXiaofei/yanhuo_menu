@@ -1,0 +1,30 @@
+{
+	"pages": [
+		{
+			"path": "pages/login/Login",
+			"style": {
+				"navigationBarTitleText": "登录"
+			}
+		},
+		{
+			"path": "pages/index/Index",
+			"style": {
+				"navigationBarTitleText": "小食单"
+			}
+		}
+	],
+	"globalStyle": {
+		"navigationBarBackgroundColor": "#FF8C42",
+		"navigationBarTextStyle": "white"
+	},
+	"tabBar": {
+		"color": "#999999",
+		"selectedColor": "#FF8C42",
+		"list": [
+			{
+				"pagePath": "pages/index/Index",
+				"text": "首页"
+			}
+		]
+	}
+}
