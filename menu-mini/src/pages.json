@@ -11,6 +11,12 @@
 			"style": {
 				"navigationBarTitleText": "小食单"
 			}
+		},
+		{
+			"path": "pages/dish/List",
+			"style": {
+				"navigationBarTitleText": "菜库"
+			}
 		}
 	],
 	"globalStyle": {
