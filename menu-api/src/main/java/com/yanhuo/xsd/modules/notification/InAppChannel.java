@@ -18,7 +18,7 @@ public class InAppChannel implements NotificationChannel {
         Notification n = new Notification();
         n.setMemberId(p.memberId());
         n.setType(p.type());
-        n.setChannel("in_app");
+        n.setChannel(channelKey());
         n.setTitle(p.title());
         n.setContent(p.content());
         n.setIsRead(0);

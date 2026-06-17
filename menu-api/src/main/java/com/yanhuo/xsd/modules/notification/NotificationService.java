@@ -14,6 +14,8 @@ import java.util.stream.Collectors;
 @Service
 public class NotificationService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(NotificationService.class);
+
     private final Map<String, NotificationChannel> channels;
     private final NotificationMapper notificationMapper;
 
@@ -26,7 +28,8 @@ public class NotificationService {
 
     public void send(NotificationPayload payload, String channelKey) {
         NotificationChannel ch = channels.get(channelKey);
-        if (ch != null) ch.send(payload);
+        if (ch == null) { log.warn("通知通道未注册: {}", channelKey); return; }
+        ch.send(payload);
     }
 
     public void sendAll(NotificationPayload payload, Collection<String> channelKeys) {
@@ -43,7 +46,8 @@ public class NotificationService {
             .eq("member_id", memberId).eq("is_read", 0));
     }
 
-    public void markRead(Long id) {
-        notificationMapper.update(null, new UpdateWrapper<Notification>().eq("id", id).set("is_read", 1));
+    public void markRead(Long id, Long memberId) {
+        notificationMapper.update(null, new UpdateWrapper<Notification>()
+            .eq("id", id).eq("member_id", memberId).set("is_read", 1));
     }
 }

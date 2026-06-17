@@ -1,6 +1,7 @@
 package com.yanhuo.xsd.modules.notification;
 
 import cn.dev33.satoken.stp.StpUtil;
+import com.yanhuo.xsd.common.BizException;
 import com.yanhuo.xsd.common.R;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -29,11 +30,13 @@ public class NotificationController {
 
     @PutMapping("/{id}/read")
     public R<?> markRead(@PathVariable Long id) {
-        svc.markRead(id);
+        svc.markRead(id, currentMemberId());
         return R.ok(null);
     }
 
     private Long currentMemberId() {
-        return StpUtil.getSession().getLong("currentMemberId");
+        Long id = StpUtil.getSession().getLong("currentMemberId");
+        if (id == null) throw new BizException("请先选择就餐成员");
+        return id;
     }
 }
