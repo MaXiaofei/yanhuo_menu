@@ -55,12 +55,22 @@ const active = ref(-1)
 const elapsed = ref(0)
 let timer: any = null
 
+// 后端 nutrition_metric 字典的 name 是英文（calorie/protein/fat/carb/sugar/gi），家庭看不懂 → 中文映射，兜底英文防新增指标无映射
+const METRIC_CN: Record<string, string> = {
+  calorie: '热量',
+  protein: '蛋白质',
+  fat: '脂肪',
+  carb: '碳水',
+  sugar: '糖',
+  gi: '升糖指数'
+}
+
 // 把 nutrition(Map 指标id→值) + metrics(字典) 合成可读列表「名字: 值(单位)」
 const nutritionDisplay = computed(() => {
   const arr: { label: string; value: any }[] = []
   for (const m of metrics.value) {
     const v = nutrition.value[m.id]
-    if (v !== undefined && v !== null) arr.push({ label: m.name, value: `${v}${m.unit ? m.unit : ''}` })
+    if (v !== undefined && v !== null) arr.push({ label: METRIC_CN[m.name] || m.name, value: `${v}${m.unit ? m.unit : ''}` })
   }
   return arr
 })
