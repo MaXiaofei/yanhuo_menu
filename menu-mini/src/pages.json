@@ -17,6 +17,12 @@
 			"style": {
 				"navigationBarTitleText": "菜库"
 			}
+		},
+		{
+			"path": "pages/dish/Detail",
+			"style": {
+				"navigationBarTitleText": "菜品详情"
+			}
 		}
 	],
 	"globalStyle": {
