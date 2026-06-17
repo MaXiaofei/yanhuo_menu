@@ -6,10 +6,10 @@
       <text class="meta">备料 {{ dish.prepTime || 0 }}分 · 烹饪 {{ dish.cookTime || 0 }}分 · 难度 {{ dish.difficulty || '-' }}/5</text>
       <text class="note" v-if="dish.note">{{ dish.note }}</text>
     </view>
-    <view class="nutrition" v-if="Object.keys(nutrition).length">
+    <view class="nutrition" v-if="nutritionDisplay.length">
       <text class="section">营养（份数 {{ serving }}）</text>
       <view class="tags">
-        <u-tag v-for="(v, k) in nutrition" :key="k" :text="`${k}: ${v}`" type="success" size="mini" />
+        <u-tag v-for="(n, i) in nutritionDisplay" :key="i" :text="`${n.label}: ${n.value}`" type="success" size="mini" />
       </view>
     </view>
     <view class="steps">
@@ -38,7 +38,7 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { dishDetail, dishNutrition, markDone } from '@/api/dish'
+import { dishDetail, dishNutrition, markDone, nutritionMetrics } from '@/api/dish'
 import { useMemberStore } from '@/store/member'
 
 const m = useMemberStore()
@@ -48,11 +48,22 @@ const dish = computed(() => data.value?.dish || null)
 const steps = computed(() => data.value?.steps || [])
 
 const nutrition = ref<Record<string, any>>({})
+const metrics = ref<any[]>([])
 const serving = ref(1)
 const dishId = ref(0)
 const active = ref(-1)
 const elapsed = ref(0)
 let timer: any = null
+
+// 把 nutrition(Map 指标id→值) + metrics(字典) 合成可读列表「名字: 值(单位)」
+const nutritionDisplay = computed(() => {
+  const arr: { label: string; value: any }[] = []
+  for (const m of metrics.value) {
+    const v = nutrition.value[m.id]
+    if (v !== undefined && v !== null) arr.push({ label: m.name, value: `${v}${m.unit ? m.unit : ''}` })
+  }
+  return arr
+})
 
 onLoad(async (q: any) => {
   dishId.value = q.id
@@ -66,6 +77,11 @@ onLoad(async (q: any) => {
     nutrition.value = await dishNutrition(q.id, serving.value)
   } catch {
     // 营养加载失败不阻断详情展示
+  }
+  try {
+    metrics.value = await nutritionMetrics()
+  } catch {
+    // 字典加载失败不阻断详情展示
   }
 })
 

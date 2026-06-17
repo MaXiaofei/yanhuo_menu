@@ -18,3 +18,6 @@ export const markDone = (dishId: number, memberId: number, note?: string) =>
 // 录入新菜：后端 POST /dish @RequestBody DishSaveDTO { dish, steps, cuisineIds, tagIds, categoryIds, ingredients }
 // V1 第一批：仅 dish + steps（关联/食材 YAGNI 留第二批）
 export const saveDish = (data: any) => request({ url: '/dish', method: 'POST', data })
+
+// 营养指标字典：[{id,name,unit,metricGroup,sort}]，把 nutrition 的 id(→值) 映射成「名字: 值(单位)」
+export const nutritionMetrics = () => request<any[]>({ url: '/nutrition/metric', method: 'GET' })
