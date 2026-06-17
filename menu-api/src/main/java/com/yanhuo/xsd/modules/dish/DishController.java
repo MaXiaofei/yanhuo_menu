@@ -6,7 +6,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/dish")
@@ -15,6 +17,7 @@ import java.util.List;
 public class DishController {
 
     private final DishService svc;
+    private final DishQueryService querySvc;
 
     @GetMapping
     public R<List<Dish>> list() {
@@ -26,15 +29,43 @@ public class DishController {
         return R.ok(svc.detail(id));
     }
 
+    /** 份数营养：复用 NutritionCalcService。 */
+    @GetMapping("/{id}/nutrition")
+    public R<Map<Long, BigDecimal>> nutrition(@PathVariable Long id,
+                                              @RequestParam(required = false) BigDecimal serving) {
+        return R.ok(querySvc.nutrition(id, serving));
+    }
+
+    @GetMapping("/{id}/history")
+    public R<List<DishHistory>> history(@PathVariable Long id) {
+        return R.ok(querySvc.history(id));
+    }
+
+    @DeleteMapping("/{id}/history/{hid}")
+    public R<?> deleteHistory(@PathVariable Long id, @PathVariable Long hid) {
+        querySvc.deleteHistory(id, hid);
+        return R.ok(null);
+    }
+
+    @DeleteMapping("/{id}/history")
+    public R<?> clearHistory(@PathVariable Long id) {
+        querySvc.clearHistory(id);
+        return R.ok(null);
+    }
+
     @PostMapping
     public R<?> save(@RequestBody DishSaveDTO dto) {
-        svc.saveWithSteps(dto.getDish(), dto.getSteps());
+        svc.saveFull(dto);
         return R.ok(dto.getDish().getId());
     }
 
+    /** 更新：先存历史快照，再保存（Controller 编排，避开 Service 循环依赖）。 */
     @PutMapping
     public R<?> update(@RequestBody DishSaveDTO dto) {
-        svc.saveWithSteps(dto.getDish(), dto.getSteps());
+        if (dto.getDish().getId() != null) {
+            querySvc.snapshotBeforeUpdate(dto.getDish().getId());
+        }
+        svc.saveFull(dto);
         return R.ok(null);
     }
 
