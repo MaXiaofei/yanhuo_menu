@@ -32,4 +32,17 @@ public class CookbookController {
     public R<List<Dish>> favorites(@RequestParam Long memberId) {
         return R.ok(svc.listFavorites(memberId));
     }
+
+    @PostMapping("/done/{dishId}")
+    public R<?> markDone(@PathVariable Long dishId,
+                         @RequestParam Long memberId,
+                         @RequestParam(required = false) String note) {
+        svc.markDone(memberId, dishId, note);
+        return R.ok(null);
+    }
+
+    @GetMapping("/done")
+    public R<List<Dish>> done(@RequestParam Long memberId) {
+        return R.ok(svc.listDone(memberId));
+    }
 }
