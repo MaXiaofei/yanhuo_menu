@@ -20,6 +20,7 @@ import {
 import { listByGroup, listNutritionMetrics, type DictItem, type NutritionMetric } from '@/api/dict'
 import { listIngredients, type Ingredient } from '@/api/ingredient'
 import { upload } from '@/api/upload'
+import type { UploadAjaxError } from 'element-plus/es/components/upload/src/ajax'
 
 // ===== 字典/选项 =====
 const cuisineOptions = ref<DictItem[]>([])
@@ -225,7 +226,15 @@ async function customUpload(opts: UploadRequestOptions) {
     const r = await upload(file)
     opts.onSuccess(r)
   } catch (e) {
-    opts.onError(e instanceof Error ? e : new Error(String(e)))
+    // Element Plus 的 onError 要求 UploadAjaxError(带 status/method/url)；
+    // 这里把任意异常包装成符合签名的对象，保留原始 message 供界面展示。
+    const raw = e instanceof Error ? e : new Error(String(e))
+    const ajaxErr = Object.assign(new Error(raw.message), {
+      status: 0,
+      method: 'POST',
+      url: '',
+    }) as UploadAjaxError
+    opts.onError(ajaxErr)
   }
 }
 
@@ -425,7 +434,7 @@ async function showHistory(row: DishSearchRow) {
           </div>
           <el-input v-model="s.text" type="textarea" :rows="2" placeholder="步骤描述" />
           <div class="step-imgs">
-            <div v-for="(img, j) in s.images || []" :key="j" class="step-img-row">
+            <div v-for="(_img, j) in s.images || []" :key="j" class="step-img-row">
               <el-input v-model="s.images![j]" placeholder="图片URL" style="width: 320px" />
               <el-button link type="danger" @click="removeStepImage(s, j)">移除</el-button>
             </div>

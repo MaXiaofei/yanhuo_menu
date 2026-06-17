@@ -66,7 +66,7 @@ function openCreate() {
   dialogVisible.value = true
 }
 
-function openEdit(row: Menu) {
+async function openEdit(row: Menu) {
   resetForm()
   editing.value = row
   baseForm.id = row.id
