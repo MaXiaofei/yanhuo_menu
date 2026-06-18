@@ -17,10 +17,18 @@ import java.util.Map;
 public class NotificationController {
 
     private final NotificationService svc;
+    private final NotificationScheduler scheduler;
 
     @GetMapping
     public R<List<Notification>> list() {
         return R.ok(svc.list(currentMemberId()));
+    }
+
+    /** 手动触发临期扫描（不等 @Scheduled），便于 E2E/演示。返回发送条数。 */
+    @PostMapping("/scan-expiring")
+    public R<Map<String, Object>> scanExpiring(@RequestParam(defaultValue = "3") int days) {
+        int sent = scheduler.checkExpiring(days);
+        return R.ok(Map.of("sent", sent));
     }
 
     @GetMapping("/unread-count")

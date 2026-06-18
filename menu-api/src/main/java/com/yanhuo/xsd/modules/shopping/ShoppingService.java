@@ -15,9 +15,12 @@ import com.yanhuo.xsd.modules.mealplan.mapper.MealPlanItemMapper;
 import com.yanhuo.xsd.modules.mealplan.mapper.MealPlanMapper;
 import com.yanhuo.xsd.modules.nutrition.Ingredient;
 import com.yanhuo.xsd.modules.nutrition.mapper.IngredientMapper;
+import com.yanhuo.xsd.modules.notification.NotificationPayload;
+import com.yanhuo.xsd.modules.notification.NotificationService;
 import com.yanhuo.xsd.modules.shopping.ShoppingAggregator.Usage;
 import com.yanhuo.xsd.modules.shopping.mapper.ShoppingItemMapper;
 import com.yanhuo.xsd.modules.shopping.mapper.ShoppingListMapper;
+import cn.dev33.satoken.stp.StpUtil;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -54,6 +57,7 @@ public class ShoppingService extends ServiceImpl<ShoppingListMapper, ShoppingLis
     private final IngredientMapper ingredientMapper;
     private final DictMapper dictMapper;
     private final ShoppingAggregator aggregator;
+    private final NotificationService notificationService;
 
     @Autowired
     public ShoppingService(ShoppingItemMapper itemMapper,
@@ -62,7 +66,8 @@ public class ShoppingService extends ServiceImpl<ShoppingListMapper, ShoppingLis
                            DishIngredientMapper dishIngredientMapper,
                            IngredientMapper ingredientMapper,
                            DictMapper dictMapper,
-                           ShoppingAggregator aggregator) {
+                           ShoppingAggregator aggregator,
+                           NotificationService notificationService) {
         this.itemMapper = itemMapper;
         this.mealPlanItemMapper = mealPlanItemMapper;
         this.mealPlanMapper = mealPlanMapper;
@@ -70,6 +75,7 @@ public class ShoppingService extends ServiceImpl<ShoppingListMapper, ShoppingLis
         this.ingredientMapper = ingredientMapper;
         this.dictMapper = dictMapper;
         this.aggregator = aggregator;
+        this.notificationService = notificationService;
     }
 
     // ===================== 生成 =====================
@@ -142,7 +148,21 @@ public class ShoppingService extends ServiceImpl<ShoppingListMapper, ShoppingLis
             item.setPurchased(0);
             itemMapper.insert(item);
         }
+
+        // 8. 通知当前就餐成员：采购清单已生成
+        notifyShoppingGenerated(lines.size());
         return list.getId();
+    }
+
+    /** 给当前 session 的就餐成员发「采购清单已生成」站内通知；无 session 则跳过。 */
+    private void notifyShoppingGenerated(int itemCount) {
+        Long memberId = StpUtil.getSession().getLong("currentMemberId");
+        if (memberId == null) return;
+        notificationService.send(
+                new NotificationPayload(memberId, "shopping",
+                        "采购清单已生成",
+                        "周计划已生成采购清单，共 " + itemCount + " 项"),
+                "in_app");
     }
 
     private Long persistEmptyPlan(Long planId, String timeRange) {
