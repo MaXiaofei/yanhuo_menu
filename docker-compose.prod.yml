@@ -39,7 +39,7 @@ services:
     restart: unless-stopped
     depends_on: [menu-api]
     ports:
-      - "80:80"
+      - "8081:80"
 
 volumes:
   mysql-data:
