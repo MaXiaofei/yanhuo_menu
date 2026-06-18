@@ -61,6 +61,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '食材库存' },
       },
       {
+        path: 'shopping',
+        name: 'Shopping',
+        component: () => import('@/views/shopping/Index.vue'),
+        meta: { title: '采购清单' },
+      },
+      {
         path: 'backup',
         name: 'Backup',
         component: () => import('@/views/backup/Index.vue'),

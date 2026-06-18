@@ -49,6 +49,12 @@
 			}
 		},
 		{
+			"path": "pages/shopping/List",
+			"style": {
+				"navigationBarTitleText": "采购清单"
+			}
+		},
+		{
 			"path": "pages/dailylog/Index",
 			"style": {
 				"navigationBarTitleText": "每日饮食记录"
