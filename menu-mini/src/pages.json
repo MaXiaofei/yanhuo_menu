@@ -47,6 +47,12 @@
 			"style": {
 				"navigationBarTitleText": "食材库存"
 			}
+		},
+		{
+			"path": "pages/dailylog/Index",
+			"style": {
+				"navigationBarTitleText": "每日饮食记录"
+			}
 		}
 	],
 	"globalStyle": {
