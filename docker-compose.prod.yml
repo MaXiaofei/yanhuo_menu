@@ -12,7 +12,7 @@ services:
       MYSQL_ROOT_PASSWORD: MYSQL_PWD_REDACTED
       MYSQL_DATABASE: yanhuo
       TZ: Asia/Shanghai
-    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci", "--character-set-client-handshake=FALSE"]
     volumes:
       - mysql-data:/var/lib/mysql
       - ./menu-api/sql:/docker-entrypoint-initdb.d:ro   # 首启自动建表+灌种子(V1..V11)
