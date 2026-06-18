@@ -2,6 +2,7 @@ package com.yanhuo.xsd.modules.dish;
 
 import com.yanhuo.xsd.common.R;
 import com.yanhuo.xsd.modules.dish.DishService.DishDetail;
+import com.yanhuo.xsd.modules.member.MpPerm;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -61,6 +62,7 @@ public class DishController {
     }
 
     @PostMapping
+    @MpPerm("dish.create")
     public R<?> save(@RequestBody DishSaveDTO dto) {
         svc.saveFull(dto);
         return R.ok(dto.getDish().getId());
@@ -68,6 +70,7 @@ public class DishController {
 
     /** 更新：先存历史快照，再保存（Controller 编排，避开 Service 循环依赖）。 */
     @PutMapping
+    @MpPerm("dish.edit")
     public R<?> update(@RequestBody DishSaveDTO dto) {
         if (dto.getDish().getId() != null) {
             querySvc.snapshotBeforeUpdate(dto.getDish().getId());

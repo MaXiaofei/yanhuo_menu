@@ -18,6 +18,8 @@ export interface Member {
   /** 角色标签：逗号分隔的 role 字典 id 字符串（如 "32,34"）。 */
   roleTags: string
   healthProfile: HealthProfile
+  /** 小程序功能权限 key 数组（个人勾选；null 走角色默认模板）。 */
+  mpPermissions?: string[] | null
 }
 
 export interface MemberSaveDTO {
@@ -26,11 +28,17 @@ export interface MemberSaveDTO {
   /** 提交时为逗号分隔的 role 字典 id 字符串。 */
   roleTags: string
   healthProfile: HealthProfile
+  mpPermissions?: string[] | null
 }
 
 export interface MemberPage {
   records: Member[]
   total: number
+}
+
+/** 全量功能权限 key -> 中文映射（供表单多选项）。 */
+export async function listPermKeys() {
+  return request<Record<string, string>>({ url: '/member/permissions/keys', method: 'get' })
 }
 
 export function listMembers(params: { pageNum: number; pageSize: number }) {

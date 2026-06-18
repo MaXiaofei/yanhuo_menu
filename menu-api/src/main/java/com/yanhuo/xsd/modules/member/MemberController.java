@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/member")
@@ -17,6 +19,7 @@ import java.util.List;
 public class MemberController {
 
     private final MemberService svc;
+    private final MpPermissionService permSvc;
 
     @GetMapping
     public R<IPage<Member>> list(PageQuery q) {
@@ -34,6 +37,18 @@ public class MemberController {
     @GetMapping("/current")
     public R<Long> getCurrent() {
         return R.ok(StpUtil.getSession().getLong("currentMemberId"));
+    }
+
+    /** 解析某成员最终权限集合(角色默认 + 个人勾选并集)。供前端按钮显隐。 */
+    @GetMapping("/{id}/permissions")
+    public R<Set<String>> permissions(@PathVariable Long id) {
+        return R.ok(permSvc.resolveByMemberId(id));
+    }
+
+    /** 全量功能 key + 中文映射(供后台 member 表单多选项)。 */
+    @GetMapping("/permissions/keys")
+    public R<Map<String, String>> permKeys() {
+        return R.ok(MpPermissionService.allPermLabels());
     }
 
     @PostMapping

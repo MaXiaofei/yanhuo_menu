@@ -3,6 +3,7 @@ package com.yanhuo.xsd.modules.mealplan;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yanhuo.xsd.common.PageQuery;
 import com.yanhuo.xsd.common.R;
+import com.yanhuo.xsd.modules.member.MpPerm;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -31,6 +32,7 @@ public class MealPlanController {
 
     /** 创建周计划。 */
     @PostMapping
+    @MpPerm("menu.plan")
     public R<Long> create(@RequestBody CreatePlanReq req) {
         return R.ok(svc.createPlan(req.weekStart(), req.name()));
     }
@@ -46,6 +48,7 @@ public class MealPlanController {
      * 返回当前 plan 下与该 item 同日同餐的重复提示（detectDuplicates 纯函数结果）。
      */
     @PostMapping("/{planId}/item")
+    @MpPerm("menu.plan")
     public R<Map<String, Object>> addItem(@PathVariable Long planId, @RequestBody MealPlanItem item) {
         item.setPlanId(planId);
         List<MealPlanService.Item> dup = svc.saveItem(item);

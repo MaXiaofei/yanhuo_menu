@@ -9,6 +9,7 @@ import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -29,6 +30,13 @@ public class Member {
     /** 健康档案 JSON，灵活存三高指标/忌口/特殊人群/营养约束。 */
     @TableField(typeHandler = JacksonTypeHandler.class)
     private Map<String, Object> healthProfile;
+
+    /**
+     * 小程序功能权限 key 数组(JSON)。如 ["dish.create","menu.plan"]。
+     * null 时走角色默认模板;非空时与角色默认取并集(个人勾选只能增不能减)。
+     */
+    @TableField(typeHandler = JacksonTypeHandler.class)
+    private List<String> mpPermissions;
 
     private LocalDateTime createTime;
 

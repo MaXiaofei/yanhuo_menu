@@ -6,6 +6,7 @@ import {
   createMember,
   updateMember,
   deleteMember,
+  listPermKeys,
   type Member,
   type HealthProfile,
 } from '@/api/member'
@@ -18,6 +19,8 @@ const pageNum = ref(1)
 const pageSize = 10
 const audienceOptions = ref<DictItem[]>([])
 const roleOptions = ref<DictItem[]>([])
+/** 全量功能权限 key -> 中文映射（来自后端 /member/permissions/keys）。 */
+const permOptions = ref<Record<string, string>>({})
 
 async function load() {
   loading.value = true
@@ -36,9 +39,10 @@ function onPageChange(p: number) {
 }
 
 async function loadDicts() {
-  const [a, r] = await Promise.all([listByGroup('audience'), listByGroup('role')])
+  const [a, r, p] = await Promise.all([listByGroup('audience'), listByGroup('role'), listPermKeys()])
   audienceOptions.value = a
   roleOptions.value = r
+  permOptions.value = p || {}
 }
 
 onMounted(() => {
@@ -78,6 +82,8 @@ function blankForm() {
     name: '',
     // 表单内部用 number[]（role 字典 id）承载多选
     roleTags: [] as number[],
+    // 小程序功能权限个人勾选（key 数组，null 走角色默认模板）
+    mpPermissions: [] as string[],
     healthProfile: {
       height: undefined as number | undefined,
       weight: undefined as number | undefined,
@@ -108,6 +114,7 @@ function openEdit(row: Member) {
   resetForm()
   form.name = row.name
   form.roleTags = parseRoleIds(row.roleTags)
+  form.mpPermissions = Array.isArray(row.mpPermissions) ? [...row.mpPermissions] : []
   form.healthProfile = { ...(row.healthProfile || {}) } as HealthProfile
   if (!form.healthProfile.audiences) form.healthProfile.audiences = []
   if (!form.healthProfile.allergies) form.healthProfile.allergies = []
@@ -121,12 +128,15 @@ async function onSubmit() {
   }
   // roleTags 表单内为 number[]，后端存逗号分隔 id 串
   const roleTagsStr = form.roleTags.map(String).join(',')
+  // mpPermissions：空数组时传 null，让后端走角色默认模板
+  const mpPermissions = form.mpPermissions.length ? [...form.mpPermissions] : null
   if (editing.value) {
     await updateMember({
       id: editing.value.id,
       name: form.name.trim(),
       roleTags: roleTagsStr,
       healthProfile: form.healthProfile,
+      mpPermissions,
     })
     ElMessage.success('已更新')
   } else {
@@ -134,6 +144,7 @@ async function onSubmit() {
       name: form.name.trim(),
       roleTags: roleTagsStr,
       healthProfile: form.healthProfile,
+      mpPermissions,
     })
     ElMessage.success('已新增')
   }
@@ -252,6 +263,23 @@ async function onDelete(row: Member) {
         <el-form-item label="盐上限(g)">
           <el-input-number v-model="form.healthProfile.saltMax" :min="0" />
         </el-form-item>
+        <el-divider content-position="left">小程序功能权限</el-divider>
+        <el-form-item label="功能权限">
+          <div class="perm-hint mini">
+            不勾选时走角色默认模板（掌勺全权 / 备菜备菜相关 / 普通成员只读点评）。
+            勾选为「放宽」：个人勾选与角色默认取并集，只能增不能减。
+          </div>
+          <el-checkbox-group v-model="form.mpPermissions">
+            <el-checkbox
+              v-for="(label, key) in permOptions"
+              :key="key"
+              :value="key"
+              :label="label"
+            >
+              {{ label }}
+            </el-checkbox>
+          </el-checkbox-group>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -273,5 +301,9 @@ async function onDelete(row: Member) {
 .mini {
   font-size: 12px;
   color: #7a6f60;
+}
+.perm-hint {
+  margin-bottom: 8px;
+  line-height: 1.5;
 }
 </style>
