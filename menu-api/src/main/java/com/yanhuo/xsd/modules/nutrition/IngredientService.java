@@ -1,7 +1,10 @@
 package com.yanhuo.xsd.modules.nutrition;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.yanhuo.xsd.common.PageQuery;
 import com.yanhuo.xsd.modules.nutrition.mapper.IngredientMapper;
 import com.yanhuo.xsd.modules.nutrition.mapper.IngredientNutritionMapper;
 import com.yanhuo.xsd.modules.nutrition.mapper.NutritionMetricMapper;
@@ -50,18 +53,38 @@ public class IngredientService extends ServiceImpl<IngredientMapper, Ingredient>
     public List<IngredientVO> listWithNutrition() {
         Map<Long, String> metricNameById = metricMapper.selectList(null).stream()
                 .collect(Collectors.toMap(NutritionMetric::getId, NutritionMetric::getName));
-        return list().stream().map(ing -> {
-            IngredientVO vo = new IngredientVO();
-            BeanUtils.copyProperties(ing, vo);
-            Map<String, BigDecimal> named = new HashMap<>();
-            for (Map.Entry<Long, BigDecimal> e : nutritionOf(ing.getId()).entrySet()) {
-                String name = metricNameById.get(e.getKey());
-                if (name != null) {
-                    named.put(name, e.getValue());
-                }
+        return list().stream().map(ing -> toVO(ing, metricNameById)).collect(Collectors.toList());
+    }
+
+    /**
+     * 分页列表（含营养，后台管理）：分页查食材实体后，逐条填营养 VO。
+     * IPage 的 records 转成 VO 后塞回同一 IPage（total/current/size 不变）。
+     */
+    public IPage<IngredientVO> pageWithNutrition(PageQuery q) {
+        Map<Long, String> metricNameById = metricMapper.selectList(null).stream()
+                .collect(Collectors.toMap(NutritionMetric::getId, NutritionMetric::getName));
+        IPage<Ingredient> page = page(new Page<>(q.getPageNum(), q.getPageSize()),
+                new QueryWrapper<Ingredient>().orderByDesc("id"));
+        List<IngredientVO> voRecords = page.getRecords().stream()
+                .map(ing -> toVO(ing, metricNameById))
+                .collect(Collectors.toList());
+        // IPage 是接口，直接转换 records；用 setRecords 保留分页元信息
+        Page<IngredientVO> result = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
+        result.setRecords(voRecords);
+        return result;
+    }
+
+    private IngredientVO toVO(Ingredient ing, Map<Long, String> metricNameById) {
+        IngredientVO vo = new IngredientVO();
+        BeanUtils.copyProperties(ing, vo);
+        Map<String, BigDecimal> named = new HashMap<>();
+        for (Map.Entry<Long, BigDecimal> e : nutritionOf(ing.getId()).entrySet()) {
+            String name = metricNameById.get(e.getKey());
+            if (name != null) {
+                named.put(name, e.getValue());
             }
-            vo.setNutrition(named);
-            return vo;
-        }).collect(Collectors.toList());
+        }
+        vo.setNutrition(named);
+        return vo;
     }
 }

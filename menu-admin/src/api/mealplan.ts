@@ -35,8 +35,13 @@ export interface MenuTemplate {
   createTime?: string
 }
 
-export function listPlans() {
-  return request<MealPlan[]>({ url: '/mealplan', method: 'get' })
+export interface MealPlanPage {
+  records: MealPlan[]
+  total: number
+}
+
+export function listPlans(params: { pageNum: number; pageSize: number }) {
+  return request<MealPlanPage>({ url: '/mealplan', method: 'get', params })
 }
 
 export function createPlan(weekStart: string, name?: string) {

@@ -26,8 +26,13 @@ export interface MemberSaveDTO {
   healthProfile: HealthProfile
 }
 
-export function listMembers() {
-  return request<Member[]>({ url: '/member', method: 'get' })
+export interface MemberPage {
+  records: Member[]
+  total: number
+}
+
+export function listMembers(params: { pageNum: number; pageSize: number }) {
+  return request<MemberPage>({ url: '/member', method: 'get', params })
 }
 
 export function createMember(data: MemberSaveDTO) {

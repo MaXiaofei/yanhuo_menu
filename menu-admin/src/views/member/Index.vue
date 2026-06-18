@@ -13,16 +13,26 @@ import { listByGroup, type DictItem } from '@/api/dict'
 
 const loading = ref(false)
 const list = ref<Member[]>([])
+const total = ref(0)
+const pageNum = ref(1)
+const pageSize = 10
 const audienceOptions = ref<DictItem[]>([])
 const roleOptions = ref<DictItem[]>([])
 
 async function load() {
   loading.value = true
   try {
-    list.value = await listMembers()
+    const page = await listMembers({ pageNum: pageNum.value, pageSize })
+    list.value = page.records || []
+    total.value = page.total || 0
   } finally {
     loading.value = false
   }
+}
+
+function onPageChange(p: number) {
+  pageNum.value = p
+  load()
 }
 
 async function loadDicts() {
@@ -145,6 +155,16 @@ async function onDelete(row: Member) {
         </template>
       </el-table-column>
     </el-table>
+
+    <el-pagination
+      background
+      layout="total, prev, pager, next, jumper"
+      :total="total"
+      :page-size="pageSize"
+      :current-page="pageNum"
+      @current-change="onPageChange"
+      style="margin-top: 16px; justify-content: flex-end; display: flex"
+    />
 
     <el-dialog v-model="dialogVisible" :title="editing ? '编辑成员' : '新增成员'" width="560px">
       <el-form label-width="100px">

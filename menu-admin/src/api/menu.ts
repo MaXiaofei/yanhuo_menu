@@ -29,8 +29,13 @@ export interface MenuSummary {
   totalNutrition: Record<string, number>
 }
 
-export function listMenus() {
-  return request<Menu[]>({ url: '/menu', method: 'get' })
+export interface MenuPage {
+  records: Menu[]
+  total: number
+}
+
+export function listMenus(params: { pageNum: number; pageSize: number }) {
+  return request<MenuPage>({ url: '/menu', method: 'get', params })
 }
 
 export function getMenuDetail(id: number) {

@@ -1,5 +1,7 @@
 package com.yanhuo.xsd.modules.mealplan;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.yanhuo.xsd.common.PageQuery;
 import com.yanhuo.xsd.common.R;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -21,10 +23,10 @@ public class MealPlanController {
 
     private final MealPlanService svc;
 
-    /** 周计划列表（后台管理用）。 */
+    /** 周计划列表（后台管理用，分页）。 */
     @GetMapping
-    public R<List<MealPlan>> list() {
-        return R.ok(svc.list());
+    public R<IPage<MealPlan>> list(PageQuery q) {
+        return R.ok(svc.page(q));
     }
 
     /** 创建周计划。 */

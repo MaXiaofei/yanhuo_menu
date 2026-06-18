@@ -2,7 +2,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  listByGroup,
+  listDictPaged,
   createDict,
   updateDict,
   deleteDict,
@@ -40,20 +40,34 @@ const groupTabs: GroupTab[] = [
 
 const activeTab = ref<string>('cuisine')
 const loading = ref(false)
+const pageSize = 10
 
-// 各 group 的字典数据
-const dictMap = reactive<Record<string, DictItem[]>>({})
+interface GroupState {
+  records: DictItem[]
+  total: number
+  pageNum: number
+}
+
+// 各 group 的分页状态
+const dictMap = reactive<Record<string, GroupState>>({})
 // 营养指标数据
 const metrics = ref<NutritionMetric[]>([])
 
 async function loadGroup(group: string) {
   loading.value = true
   try {
-    const list = await listByGroup(group)
-    dictMap[group] = list
+    const st = dictMap[group] || { records: [], total: 0, pageNum: 1 }
+    const page = await listDictPaged(group, { pageNum: st.pageNum, pageSize })
+    dictMap[group] = { records: page.records || [], total: page.total || 0, pageNum: st.pageNum }
   } finally {
     loading.value = false
   }
+}
+
+function onPageChange(group: string, p: number) {
+  if (!dictMap[group]) dictMap[group] = { records: [], total: 0, pageNum: 1 }
+  dictMap[group].pageNum = p
+  loadGroup(group)
 }
 
 async function loadMetrics() {
@@ -136,7 +150,7 @@ async function onDelete(row: DictItem) {
         <div class="tab-toolbar">
           <el-button type="primary" @click="openCreate">新增{{ g.title }}</el-button>
         </div>
-        <el-table v-loading="loading" :data="dictMap[g.key] || []" border size="default">
+        <el-table v-loading="loading" :data="(dictMap[g.key] && dictMap[g.key].records) || []" border size="default">
           <el-table-column label="名称" prop="name" min-width="180" />
           <el-table-column label="排序" prop="sort" width="100" />
           <el-table-column label="操作" width="160" fixed="right">
@@ -146,6 +160,15 @@ async function onDelete(row: DictItem) {
             </template>
           </el-table-column>
         </el-table>
+        <el-pagination
+          background
+          layout="total, prev, pager, next, jumper"
+          :total="(dictMap[g.key] && dictMap[g.key].total) || 0"
+          :page-size="pageSize"
+          :current-page="(dictMap[g.key] && dictMap[g.key].pageNum) || 1"
+          @current-change="(p: number) => onPageChange(g.key, p)"
+          style="margin-top: 16px; justify-content: flex-end; display: flex"
+        />
       </el-tab-pane>
 
       <el-tab-pane label="营养指标" name="nutrition">

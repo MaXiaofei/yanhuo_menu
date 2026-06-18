@@ -1,6 +1,8 @@
 package com.yanhuo.xsd.modules.member;
 
 import cn.dev33.satoken.stp.StpUtil;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.yanhuo.xsd.common.PageQuery;
 import com.yanhuo.xsd.common.R;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -17,8 +19,8 @@ public class MemberController {
     private final MemberService svc;
 
     @GetMapping
-    public R<List<Member>> list() {
-        return R.ok(svc.list());
+    public R<IPage<Member>> list(PageQuery q) {
+        return R.ok(svc.page(q));
     }
 
     /** 切换当前就餐成员（存 Sa-Token session）。 */

@@ -18,16 +18,26 @@ import { listNutritionMetrics, type NutritionMetric } from '@/api/dict'
 
 const loading = ref(false)
 const list = ref<Menu[]>([])
+const total = ref(0)
+const pageNum = ref(1)
+const pageSize = 10
 const dishes = ref<{ id: number; name: string }[]>([])
 const metrics = ref<NutritionMetric[]>([])
 
 async function load() {
   loading.value = true
   try {
-    list.value = await listMenus()
+    const page = await listMenus({ pageNum: pageNum.value, pageSize })
+    list.value = page.records || []
+    total.value = page.total || 0
   } finally {
     loading.value = false
   }
+}
+
+function onPageChange(p: number) {
+  pageNum.value = p
+  load()
 }
 
 async function loadOptions() {
@@ -200,6 +210,16 @@ onUnmounted(() => {
         </template>
       </el-table-column>
     </el-table>
+
+    <el-pagination
+      background
+      layout="total, prev, pager, next, jumper"
+      :total="total"
+      :page-size="pageSize"
+      :current-page="pageNum"
+      @current-change="onPageChange"
+      style="margin-top: 16px; justify-content: flex-end; display: flex"
+    />
 
     <!-- 新增/编辑 -->
     <el-dialog v-model="dialogVisible" :title="editing ? '编辑菜单' : '新增菜单'" width="640px">

@@ -1,5 +1,7 @@
 package com.yanhuo.xsd.modules.menu;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.yanhuo.xsd.common.PageQuery;
 import com.yanhuo.xsd.common.R;
 import com.yanhuo.xsd.modules.menu.MenuService.MenuDetail;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -17,8 +19,8 @@ public class MenuController {
     private final MenuService svc;
 
     @GetMapping
-    public R<List<Menu>> list() {
-        return R.ok(svc.list());
+    public R<IPage<Menu>> list(PageQuery q) {
+        return R.ok(svc.page(q));
     }
 
     @GetMapping("/{id}")

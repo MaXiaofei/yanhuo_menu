@@ -355,13 +355,12 @@ async function showHistory(row: DishSearchRow) {
     </el-table>
 
     <el-pagination
-      style="margin-top: 12px; justify-content: flex-end; display: flex"
+      background
+      style="margin-top: 16px; justify-content: flex-end; display: flex"
       v-model:current-page="query.pageNum"
       v-model:page-size="query.pageSize"
-      :page-sizes="[10, 20, 50]"
       :total="total"
-      layout="total, sizes, prev, pager, next"
-      @size-change="load"
+      layout="total, prev, pager, next, jumper"
       @current-change="load"
     />
 

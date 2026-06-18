@@ -1,5 +1,7 @@
 package com.yanhuo.xsd.modules.dict;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.yanhuo.xsd.common.PageQuery;
 import com.yanhuo.xsd.common.R;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -16,8 +18,8 @@ public class DictController {
     private final DictService svc;
 
     @GetMapping
-    public R<List<SysDict>> list(@RequestParam String group) {
-        return R.ok(svc.listByGroup(group));
+    public R<IPage<SysDict>> list(@RequestParam String group, PageQuery q) {
+        return R.ok(svc.pageByGroup(group, q));
     }
 
     @PostMapping

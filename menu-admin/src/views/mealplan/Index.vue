@@ -17,15 +17,25 @@ import { listDishes } from '@/api/dish'
 
 const loading = ref(false)
 const list = ref<MealPlan[]>([])
+const total = ref(0)
+const pageNum = ref(1)
+const pageSize = 10
 const dishes = ref<{ id: number; name: string }[]>([])
 
 async function load() {
   loading.value = true
   try {
-    list.value = await listPlans()
+    const page = await listPlans({ pageNum: pageNum.value, pageSize })
+    list.value = page.records || []
+    total.value = page.total || 0
   } finally {
     loading.value = false
   }
+}
+
+function onPageChange(p: number) {
+  pageNum.value = p
+  load()
 }
 
 async function loadOptions() {
@@ -169,6 +179,16 @@ async function onApplyTemplate(tplId: number) {
         </template>
       </el-table-column>
     </el-table>
+
+    <el-pagination
+      background
+      layout="total, prev, pager, next, jumper"
+      :total="total"
+      :page-size="pageSize"
+      :current-page="pageNum"
+      @current-change="onPageChange"
+      style="margin-top: 16px; justify-content: flex-end; display: flex"
+    />
 
     <!-- 新建 -->
     <el-dialog v-model="newVisible" title="新建周计划" width="480px">

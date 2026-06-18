@@ -2,7 +2,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  listIngredients,
+  listIngredientsPaged,
   createIngredient,
   updateIngredient,
   deleteIngredient,
@@ -13,6 +13,9 @@ import { listByGroup, listNutritionMetrics, type DictItem, type NutritionMetric 
 
 const loading = ref(false)
 const list = ref<Ingredient[]>([])
+const total = ref(0)
+const pageNum = ref(1)
+const pageSize = 10
 const unitOptions = ref<DictItem[]>([])
 const purchaseOptions = ref<DictItem[]>([])
 const metrics = ref<NutritionMetric[]>([])
@@ -20,10 +23,17 @@ const metrics = ref<NutritionMetric[]>([])
 async function load() {
   loading.value = true
   try {
-    list.value = await listIngredients()
+    const page = await listIngredientsPaged({ pageNum: pageNum.value, pageSize })
+    list.value = page.records || []
+    total.value = page.total || 0
   } finally {
     loading.value = false
   }
+}
+
+function onPageChange(p: number) {
+  pageNum.value = p
+  load()
 }
 
 async function loadDicts() {
@@ -189,6 +199,16 @@ async function onDelete(row: Ingredient) {
         </template>
       </el-table-column>
     </el-table>
+
+    <el-pagination
+      background
+      layout="total, prev, pager, next, jumper"
+      :total="total"
+      :page-size="pageSize"
+      :current-page="pageNum"
+      @current-change="onPageChange"
+      style="margin-top: 16px; justify-content: flex-end; display: flex"
+    />
 
     <el-dialog v-model="dialogVisible" :title="editing ? '编辑食材' : '新增食材'" width="640px">
       <el-form label-width="100px">

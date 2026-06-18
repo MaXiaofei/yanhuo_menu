@@ -20,8 +20,21 @@ export interface IngredientSaveDTO {
   nutritions: IngredientNutrition[]
 }
 
+export interface IngredientPage {
+  records: Ingredient[]
+  total: number
+}
+
+/** 拉取食材列表（全量，下拉选项用，内部取大页）。 */
 export function listIngredients() {
-  return request<Ingredient[]>({ url: '/ingredient', method: 'get' })
+  return request<IngredientPage>({ url: '/ingredient', method: 'get', params: { pageNum: 1, pageSize: 1000 } }).then(
+    (p) => p.records,
+  )
+}
+
+/** 拉取食材列表（分页，列表页用）。 */
+export function listIngredientsPaged(params: { pageNum: number; pageSize: number }) {
+  return request<IngredientPage>({ url: '/ingredient', method: 'get', params })
 }
 
 export function getIngredientNutrition(id: number) {
