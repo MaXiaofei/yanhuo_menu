@@ -69,7 +69,10 @@ public class AiService {
     public NutritionFillResponse fillNutrition(NutritionFillRequest req) {
         long start = System.currentTimeMillis();
         Long memberId = null; // 营养补全场景无 member 维度，预留
-        String reqJson = safeJson(Map.of("name", req.name(), "ingredientId", req.ingredientId()));
+        java.util.Map<String, Object> reqMap = new java.util.HashMap<>();
+        reqMap.put("name", req.name());
+        reqMap.put("ingredientId", req.ingredientId());
+        String reqJson = safeJson(reqMap);
         try {
             NutritionFillResponse resp = aiClient.fillNutrition(req);
             // 落库：ingredientId 非空时，整体替换该食材的营养 EAV（食材本身已存在，只更新营养，不重 save 防主键冲突）
