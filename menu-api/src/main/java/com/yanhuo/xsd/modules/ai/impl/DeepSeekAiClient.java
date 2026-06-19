@@ -10,6 +10,7 @@ import com.yanhuo.xsd.modules.ai.dto.NutritionFillRequest;
 import com.yanhuo.xsd.modules.ai.dto.NutritionFillResponse;
 import com.yanhuo.xsd.modules.nutrition.IngredientNutrition;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
@@ -56,7 +57,8 @@ public class DeepSeekAiClient implements AiClient {
     @Value("${yanhuo.ai.deepseek.key:}")
     private String key;
 
-    /** 生产构造：自建 RestClient。 */
+    /** 生产构造：自建 RestClient（Spring 装配用，多构造时 @Autowired 显式指定）。 */
+    @Autowired
     public DeepSeekAiClient(MockAiClient mockFallback, ObjectMapper objectMapper) {
         this(RestClient.builder().build(), mockFallback, objectMapper);
     }

@@ -30,6 +30,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       TZ: Asia/Shanghai
+      API_KEY: ${API_KEY:-}
     volumes:
       - uploads:/app/uploads
 
