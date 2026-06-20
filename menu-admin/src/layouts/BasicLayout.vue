@@ -180,6 +180,6 @@ async function onLogout() {
 .content {
   flex: 1;
   overflow: auto;
-  padding: 18px;
+  padding: 12px;
 }
 </style>
