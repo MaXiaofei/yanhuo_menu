@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import * as echarts from 'echarts'
+import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { UploadRequestOptions } from 'element-plus'
 import {
@@ -251,12 +250,20 @@ function onCoverSuccess(resp: { url: string }) {
   baseForm.coverUrl = resp.url
 }
 
-// ===== 查看营养（ECharts）=====
+// ===== 查看营养（列表）=====
 const nutritionDialogVisible = ref(false)
 const nutritionTitle = ref('')
 const nutritionData = ref<{ name: string; value: number; unit: string }[]>([])
-const chartRef = ref<HTMLDivElement>()
-let chartInstance: echarts.ECharts | null = null
+
+// 后端 nutrition_metric 字典 name 为英文，转中文便于家庭阅读
+const METRIC_CN: Record<string, string> = {
+  calorie: '热量',
+  protein: '蛋白质',
+  fat: '脂肪',
+  carb: '碳水',
+  sugar: '糖',
+  gi: '升糖指数',
+}
 
 async function showNutrition(row: DishSearchRow) {
   nutritionTitle.value = `「${row.name}」营养成分`
@@ -265,49 +272,11 @@ async function showNutrition(row: DishSearchRow) {
     const raw = await getDishNutrition(row.id, 1)
     nutritionData.value = metrics.value
       .filter((m) => raw[String(m.id)] !== undefined && raw[String(m.id)] !== null)
-      .map((m) => ({ name: m.name, value: Number(raw[String(m.id)]), unit: m.unit }))
-    await nextTick()
-    renderChart()
+      .map((m) => ({ name: METRIC_CN[m.name] || m.name, value: Number(raw[String(m.id)]), unit: m.unit }))
   } catch {
-    // 忽略
+    nutritionData.value = []
   }
 }
-
-function renderChart() {
-  if (!chartRef.value) return
-  if (!chartInstance) {
-    chartInstance = echarts.init(chartRef.value)
-  }
-  chartInstance.setOption({
-    tooltip: { trigger: 'axis' },
-    grid: { left: 50, right: 20, top: 30, bottom: 40 },
-    xAxis: {
-      type: 'category',
-      data: nutritionData.value.map((d) => d.name),
-      axisLabel: { interval: 0, rotate: 30 },
-    },
-    yAxis: { type: 'value' },
-    series: [
-      {
-        type: 'bar',
-        data: nutritionData.value.map((d) => d.value),
-        itemStyle: { color: '#E8602C', borderRadius: [4, 4, 0, 0] },
-      },
-    ],
-  })
-}
-
-watch(nutritionDialogVisible, (v) => {
-  if (!v) {
-    chartInstance?.dispose()
-    chartInstance = null
-  }
-})
-
-onUnmounted(() => {
-  chartInstance?.dispose()
-  chartInstance = null
-})
 
 // ===== 历史抽屉 =====
 const historyVisible = ref(false)
@@ -459,9 +428,17 @@ async function showHistory(row: DishSearchRow) {
       </template>
     </el-dialog>
 
-    <!-- 营养图表 -->
-    <el-dialog v-model="nutritionDialogVisible" :title="nutritionTitle" width="640px">
-      <div ref="chartRef" style="width: 100%; height: 320px"></div>
+    <!-- 营养成分列表 -->
+    <el-dialog v-model="nutritionDialogVisible" :title="nutritionTitle" width="480px">
+      <el-table :data="nutritionData" border v-if="nutritionData.length">
+        <el-table-column label="指标" prop="name" min-width="120" />
+        <el-table-column label="数值" prop="value" width="140" align="right">
+          <template #default="{ row }">
+            <span class="nut-value">{{ row.value }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="单位" prop="unit" width="100" align="left" />
+      </el-table>
       <div v-if="!nutritionData.length" class="empty">暂无营养数据</div>
     </el-dialog>
 
@@ -524,6 +501,10 @@ async function showHistory(row: DishSearchRow) {
   text-align: center;
   color: #9a8f80;
   padding: 24px;
+}
+.nut-value {
+  font-weight: bold;
+  color: #E8602C;
 }
 .snap {
   max-height: 200px;

@@ -8,8 +8,12 @@
     </view>
     <view class="nutrition" v-if="nutritionDisplay.length">
       <text class="section">营养（份数 {{ serving }}）</text>
-      <view class="tags">
-        <u-tag v-for="(n, i) in nutritionDisplay" :key="i" :text="`${n.label}: ${n.value}`" type="success" size="mini" />
+      <view class="nutrition-list">
+        <view class="nutrition-row" v-for="(n, i) in nutritionDisplay" :key="i">
+          <text class="nutrition-label">{{ n.label }}</text>
+          <text class="nutrition-value">{{ n.value }}</text>
+          <text class="nutrition-unit">{{ n.unit }}</text>
+        </view>
       </view>
     </view>
     <view class="steps">
@@ -65,12 +69,12 @@ const METRIC_CN: Record<string, string> = {
   gi: '升糖指数'
 }
 
-// 把 nutrition(Map 指标id→值) + metrics(字典) 合成可读列表「名字: 值(单位)」
+// 把 nutrition(Map 指标id→值) + metrics(字典) 合成可读列表「中文指标 + 值 + 单位」
 const nutritionDisplay = computed(() => {
-  const arr: { label: string; value: any }[] = []
+  const arr: { label: string; value: any; unit: string }[] = []
   for (const m of metrics.value) {
     const v = nutrition.value[m.id]
-    if (v !== undefined && v !== null) arr.push({ label: METRIC_CN[m.name] || m.name, value: `${v}${m.unit ? m.unit : ''}` })
+    if (v !== undefined && v !== null) arr.push({ label: METRIC_CN[m.name] || m.name, value: v, unit: m.unit ? m.unit : '' })
   }
   return arr
 })
@@ -140,7 +144,17 @@ function goReview() {
 .meta { font-size: 24rpx; color: #999; display: block; margin-top: 8rpx; }
 .note { font-size: 24rpx; color: #666; display: block; margin-top: 8rpx; }
 .section { font-size: 30rpx; font-weight: bold; padding: 20rpx; display: block; }
-.nutrition .tags { padding: 0 20rpx 10rpx; }
+.nutrition-list { padding: 0 20rpx 10rpx; }
+.nutrition-row {
+  display: flex;
+  align-items: center;
+  padding: 12rpx 0;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+.nutrition-row:last-child { border-bottom: none; }
+.nutrition-label { flex: 1; font-size: 28rpx; color: #333; }
+.nutrition-value { font-size: 30rpx; font-weight: bold; color: #FF8C42; margin-right: 8rpx; }
+.nutrition-unit { font-size: 24rpx; color: #999; width: 80rpx; text-align: left; }
 .step { padding: 16rpx 20rpx; border-top: 1rpx solid #eee; }
 .step-head { display: flex; justify-content: space-between; align-items: center; }
 .step-text { display: block; margin: 12rpx 0; font-size: 28rpx; }
