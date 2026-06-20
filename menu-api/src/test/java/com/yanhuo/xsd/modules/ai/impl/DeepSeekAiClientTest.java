@@ -61,7 +61,8 @@ class DeepSeekAiClientTest {
         when(bodySpec.body(any(Object.class))).thenReturn(bodySpec);
         when(bodySpec.retrieve()).thenReturn(responseSpec);
 
-        client = new DeepSeekAiClient(restClient, mockFallback, menuRecommender, objectMapper);
+        client = new DeepSeekAiClient(restClient, mockFallback, menuRecommender, objectMapper,
+                new com.yanhuo.xsd.modules.ai.AiOutputGuard());
         ReflectionTestUtils.setField(client, "baseUrl", "https://api.deepseek.com/v1");
         ReflectionTestUtils.setField(client, "model", "deepseek-chat");
         ReflectionTestUtils.setField(client, "key", "sk-test-key");
@@ -125,6 +126,16 @@ class DeepSeekAiClientTest {
     @Test
     void content空_降级mock() throws Exception {
         stubContent("");
+        var mockResp = new NutritionFillResponse(java.util.List.of(), "mock");
+        when(mockFallback.fillNutrition(any())).thenReturn(mockResp);
+        var r = client.fillNutrition(new NutritionFillRequest("番茄", null));
+        assertThat(r.source()).isEqualTo("mock");
+    }
+
+    @Test
+    void 护栏_模型拒答无关内容_降级mock() throws Exception {
+        // 即使绕过输入预检，模型按角色锁定返回拒答非 JSON 文本 → parseJson 抛错 → 降级 mock
+        stubContent("我只能回答食物和营养相关的问题。");
         var mockResp = new NutritionFillResponse(java.util.List.of(), "mock");
         when(mockFallback.fillNutrition(any())).thenReturn(mockResp);
         var r = client.fillNutrition(new NutritionFillRequest("番茄", null));

@@ -40,6 +40,8 @@ yanhuo:
   ai:
     # AI provider：deepseek（默认，真调 DeepSeek，失败降级 mock）/ mock（规则表兜底）/ glm（预留空壳）
     provider: ${YANHUO_AI_PROVIDER:deepseek}
+    # 每 member 每日 AI 调用上限（scene 无关，防滥用；null/无 member 不限）
+    daily-limit: ${YANHUO_AI_DAILY_LIMIT:50}
     deepseek:
       base-url: https://api.deepseek.com/v1
       model: deepseek-chat

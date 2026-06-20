@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yanhuo.xsd.common.BizException;
 import com.yanhuo.xsd.modules.ai.AiClient;
+import com.yanhuo.xsd.modules.ai.AiOutputGuard;
 import com.yanhuo.xsd.modules.ai.MenuRecommender;
 import com.yanhuo.xsd.modules.ai.dto.CandidateDish;
 import com.yanhuo.xsd.modules.ai.dto.DishEstimateRequest;
@@ -57,6 +58,17 @@ public class DeepSeekAiClient implements AiClient {
     private final MockAiClient mockFallback;
     private final MenuRecommender menuRecommender;
     private final ObjectMapper objectMapper;
+    private final AiOutputGuard outputGuard;
+
+    /**
+     * 系统 prompt 角色锁定段：所有 AI 方法 system prompt 前拼接，把模型职责严格限定在食物营养范围。
+     * 超范围请求（政治/暴力/色情/编程/闲聊等）一律回固定拒答语，不解释、不尝试回答。
+     */
+    static final String ROLE_LOCK =
+            "你是「烟火小食单」的营养师助手。你的职责严格限定在：食物营养、菜品营养估算、菜单推荐、食材营养补全。"
+                    + "对于任何超出食物营养范围的请求（包括但不限于：政治、暴力、违法犯罪、色情、编程、写文章、写诗、"
+                    + "闲聊、个人隐私询问），你必须拒绝，只回复：\"我只能回答食物和营养相关的问题。\" "
+                    + "不要尝试回答无关问题，不要解释原因。\n";
 
     @Value("${yanhuo.ai.deepseek.base-url:https://api.deepseek.com/v1}")
     private String baseUrl;
@@ -70,17 +82,19 @@ public class DeepSeekAiClient implements AiClient {
     /** 生产构造：自建 RestClient（Spring 装配用，多构造时 @Autowired 显式指定）。 */
     @Autowired
     public DeepSeekAiClient(MockAiClient mockFallback, MenuRecommender menuRecommender,
-                            ObjectMapper objectMapper) {
-        this(RestClient.builder().build(), mockFallback, menuRecommender, objectMapper);
+                            ObjectMapper objectMapper, AiOutputGuard outputGuard) {
+        this(RestClient.builder().build(), mockFallback, menuRecommender, objectMapper, outputGuard);
     }
 
     /** 测试构造：注入 mock RestClient。 */
     public DeepSeekAiClient(RestClient restClient, MockAiClient mockFallback,
-                            MenuRecommender menuRecommender, ObjectMapper objectMapper) {
+                            MenuRecommender menuRecommender, ObjectMapper objectMapper,
+                            AiOutputGuard outputGuard) {
         this.restClient = restClient;
         this.mockFallback = mockFallback;
         this.menuRecommender = menuRecommender;
         this.objectMapper = objectMapper;
+        this.outputGuard = outputGuard;
     }
 
     // ---------------- 营养补全 ----------------
@@ -95,11 +109,16 @@ public class DeepSeekAiClient implements AiClient {
                 throw new BizException("API_KEY 未配置，降级 mock");
             }
             String content = chat(
-                    "你是营养师。给定食材名，返回它每100克的营养成分 JSON，字段 calorie/protein/fat/carb/sugar/gi"
+                    ROLE_LOCK + "你是营养师。给定食材名，返回它每100克的营养成分 JSON，字段 calorie/protein/fat/carb/sugar/gi"
                             + "（数值，gi 是升糖指数 0-100）。只返回 JSON。",
                     "食材名：" + req.name());
             JsonNode node = parseJson(content);
-            return new NutritionFillResponse(toNutritionList(node), SOURCE);
+            // 若模型拒答（返回「我只能回答...」等非 JSON 文本），parseJson 抛错 → 降级 mock
+            List<IngredientNutrition> list = toNutritionList(node);
+            // 输出护栏：per100g 范围校验 + clamp，防离谱值；异常抛 BizException → 降级 mock
+            Map<Long, BigDecimal> validated = outputGuard.validateNutrition(toMap(list), true);
+            applyValues(list, validated);
+            return new NutritionFillResponse(list, SOURCE);
         } catch (Exception e) {
             log.warn("DeepSeek fillNutrition 失败，降级 mock: {}", e.getMessage());
             return mockFallback.fillNutrition(req);
@@ -129,7 +148,7 @@ public class DeepSeekAiClient implements AiClient {
 
             String user = buildUserPrompt(limited, req);
             String content = chat(
-                    "你是家庭菜单推荐助手。根据健康约束/预算/口味，从给定的候选菜里选菜组成菜单，"
+                    ROLE_LOCK + "你是家庭菜单推荐助手。根据健康约束/预算/口味，从给定的候选菜里选菜组成菜单，"
                             + "返回 JSON 对象 {\"menus\":[{\"dishes\":[{\"dishId\":数字,\"name\":\"菜名\"}],"
                             + "\"reasons\":[\"...\"]}]}。"
                             + "只能从候选菜里选，dishId 必须用候选里给出的真实数字，不编造。"
@@ -208,7 +227,7 @@ public class DeepSeekAiClient implements AiClient {
             String user = "菜品/一餐描述：" + req.description()
                     + "\n份数(servingFactor)：" + factor;
             String content = chat(
-                    "你是营养师。根据用户对一道菜/一餐的文字描述，估算其总营养成分。"
+                    ROLE_LOCK + "你是营养师。根据用户对一道菜/一餐的文字描述，估算其总营养成分。"
                             + "返回 JSON:{\"calorie\":数值,\"protein\":数值,\"fat\":数值,"
                             + "\"carb\":数值,\"sugar\":数值,\"note\":\"简要说明估算依据\"}。"
                             + "数值是该餐总量(不是per100g)，已考虑用户给的份数。只返回JSON。",
@@ -221,6 +240,8 @@ public class DeepSeekAiClient implements AiClient {
             nutrition.put(3L, scale(toBd(node.path("fat")), factor));
             nutrition.put(4L, scale(toBd(node.path("carb")), factor));
             nutrition.put(5L, scale(toBd(node.path("sugar")), factor));
+            // 输出护栏：整餐范围校验 + clamp，防离谱值；异常抛 BizException → 降级 mock
+            nutrition = outputGuard.validateNutrition(nutrition, false);
             String note = node.path("note").asText("估算基于常见份量,仅供参考");
             return new DishEstimateResponse(req.description(), nutrition, SOURCE, note);
         } catch (Exception e) {
@@ -333,6 +354,21 @@ public class DeepSeekAiClient implements AiClient {
             list.add(n);
         }
         return list;
+    }
+
+    /** List<IngredientNutrition> -> Map<metricId, value>（供 outputGuard 校验）。 */
+    private static Map<Long, BigDecimal> toMap(List<IngredientNutrition> list) {
+        Map<Long, BigDecimal> m = new LinkedHashMap<>();
+        for (IngredientNutrition n : list) m.put(n.getMetricId(), n.getValue());
+        return m;
+    }
+
+    /** 把 clamp 后的值写回 list（保持顺序与 metricId 一致）。 */
+    private static void applyValues(List<IngredientNutrition> list, Map<Long, BigDecimal> validated) {
+        for (IngredientNutrition n : list) {
+            BigDecimal v = validated.get(n.getMetricId());
+            if (v != null) n.setValue(v);
+        }
     }
 
     private static BigDecimal toBd(JsonNode n) {

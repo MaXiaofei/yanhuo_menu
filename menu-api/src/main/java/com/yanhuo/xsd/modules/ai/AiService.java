@@ -26,6 +26,7 @@ import com.yanhuo.xsd.modules.nutrition.mapper.IngredientMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -61,6 +62,11 @@ public class AiService {
     private final MemberMapper memberMapper;
     private final AiCallLogMapper aiCallLogMapper;
     private final ObjectMapper objectMapper;
+    private final AiInputGuard inputGuard;
+
+    /** 每 member 每日 AI 调用上限（配置 yanhuo.ai.daily-limit，默认 50）。null/无 member 不限。 */
+    @Value("${yanhuo.ai.daily-limit:50}")
+    private int dailyLimit;
 
     private static final long METRIC_SUGAR = 5L;
     private static final long METRIC_CAL = 1L;
@@ -70,6 +76,8 @@ public class AiService {
     public NutritionFillResponse fillNutrition(NutritionFillRequest req) {
         long start = System.currentTimeMillis();
         Long memberId = null; // 营养补全场景无 member 维度，预留
+        // 输入护栏：食材名合法性（空/过长/黑名单）。无 member → 不限额度。
+        inputGuard.validate(req.name());
         java.util.Map<String, Object> reqMap = new java.util.HashMap<>();
         reqMap.put("name", req.name());
         reqMap.put("ingredientId", req.ingredientId());
@@ -102,6 +110,8 @@ public class AiService {
     public List<MenuCandidate> recommendMenu(MenuRecommendRequest req) {
         long start = System.currentTimeMillis();
         String reqJson = safeJson(req);
+        // 额度护栏：有 member 维度时，校验今日调用次数（scene 无关，全 AI 接口共用额度）。
+        checkDailyLimit(req.memberId());
         try {
             // 1. 取成员健康档案（constraints / allergies）→ healthConstraints
             Constraints cons = new Constraints(null, null);
@@ -167,6 +177,8 @@ public class AiService {
     public DishEstimateResponse estimateDish(DishEstimateRequest req) {
         long start = System.currentTimeMillis();
         Long memberId = null; // 整体餐估算无 member 维度，预留
+        // 输入护栏：菜品描述合法性（空/过长/黑名单）。无 member → 不限额度。
+        inputGuard.validate(req.description());
         String reqJson = safeJson(req);
         try {
             DishEstimateResponse resp = aiClient.estimateDish(req);
@@ -231,6 +243,30 @@ public class AiService {
 
     private String safeJson(Object o) {
         try { return objectMapper.writeValueAsString(o); } catch (Exception e) { return null; }
+    }
+
+    /**
+     * 额度护栏：统计该 member 今日(scene 无关)AI 调用次数，超 {@link #dailyLimit} 拒绝。
+     * memberId 为 null（如营养补全/菜品估算无 member 维度）时不限制。日志查询失败不阻断主流程。
+     */
+    private void checkDailyLimit(Long memberId) {
+        if (memberId == null || dailyLimit <= 0) return;
+        try {
+            java.time.LocalDateTime todayStart =
+                    java.time.LocalDate.now().atStartOfDay();
+            Long count = aiCallLogMapper.selectCount(
+                    new QueryWrapper<AiCallLog>()
+                            .eq("member_id", memberId)
+                            .ge("create_time", todayStart));
+            if (count != null && count >= dailyLimit) {
+                throw new BizException("今日 AI 调用已达上限（" + dailyLimit + " 次），明天再试");
+            }
+        } catch (BizException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            // 额度查询本身失败（DB 抖动等）不阻断，仅 warn
+            log.warn("AI 额度查询失败 memberId={} err={}", memberId, e.getMessage());
+        }
     }
 
     private void logCall(String scene, Long memberId, String req, String resp,

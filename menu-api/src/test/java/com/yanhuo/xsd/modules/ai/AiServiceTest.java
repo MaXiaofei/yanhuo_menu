@@ -2,6 +2,7 @@ package com.yanhuo.xsd.modules.ai;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yanhuo.xsd.common.BizException;
 import com.yanhuo.xsd.modules.ai.dto.CandidateDish;
 import com.yanhuo.xsd.modules.ai.dto.MenuCandidate;
 import com.yanhuo.xsd.modules.ai.dto.MenuRecommendRequest;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -57,7 +59,10 @@ class AiServiceTest {
 
         svc = new AiService(aiClient, ingredientService, ingredientMapper,
                 dishService, dishQueryService, dishIngredientMapper,
-                memberMapper, aiCallLogMapper, new ObjectMapper());
+                memberMapper, aiCallLogMapper, new ObjectMapper(),
+                new AiInputGuard());
+        // @Value 在 new 出来的实例上不生效，手动注入默认额度
+        org.springframework.test.util.ReflectionTestUtils.setField(svc, "dailyLimit", 50);
     }
 
     private Dish dish(long id, String name, String price) {
@@ -145,5 +150,71 @@ class AiServiceTest {
         assertThat(out).containsExactly(expected);
         // 日志记录一次
         verify(aiCallLogMapper, atLeastOnce()).insert(any());
+    }
+
+    // ---------------- 护栏：额度限制 + 输入预检 ----------------
+
+    @Test
+    void 菜单推荐_今日额度超限_抛BizException() {
+        // 今日已调用 50 次（=dailyLimit）→ 第 51 次拒绝
+        when(aiCallLogMapper.selectCount(any())).thenReturn(50L);
+
+        var req = new MenuRecommendRequest(1L, new BigDecimal("100"), "DAY",
+                null, null, null, null, null);
+        assertThatThrownBy(() -> svc.recommendMenu(req))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("已达上限");
+        // 拒绝后不应再调 aiClient
+        verifyNoInteractions(aiClient);
+    }
+
+    @Test
+    void 菜单推荐_额度未超_正常调用() {
+        when(aiCallLogMapper.selectCount(any())).thenReturn(10L);
+        IPage<Dish> page = mock(IPage.class);
+        when(page.getRecords()).thenReturn(List.of(dish(1, "番茄炒蛋", "10")));
+        when(dishService.search(any(DishSearchDTO.class))).thenReturn(page);
+        when(dishQueryService.nutrition(anyLong(), any(BigDecimal.class))).thenReturn(Map.of());
+        when(dishIngredientMapper.selectList(any())).thenReturn(List.of());
+        when(memberMapper.selectById(anyLong())).thenReturn(null);
+        when(aiClient.recommendMenu(any())).thenReturn(List.of());
+
+        var req = new MenuRecommendRequest(1L, new BigDecimal("100"), "DAY",
+                null, null, null, null, null);
+        svc.recommendMenu(req);
+        verify(aiClient).recommendMenu(any());
+    }
+
+    @Test
+    void 菜单推荐_无member_不限额度() {
+        // memberId=null → 不查额度、不拒绝
+        IPage<Dish> page = mock(IPage.class);
+        when(page.getRecords()).thenReturn(List.of());
+        when(dishService.search(any(DishSearchDTO.class))).thenReturn(page);
+        when(aiClient.recommendMenu(any())).thenReturn(List.of());
+
+        var req = new MenuRecommendRequest(null, new BigDecimal("100"), "DAY",
+                null, null, null, null, null);
+        svc.recommendMenu(req);
+        verify(aiCallLogMapper, never()).selectCount(any());
+        verify(aiClient).recommendMenu(any());
+    }
+
+    @Test
+    void 营养补全_黑名单输入_拒绝_不调ai() {
+        var req = new com.yanhuo.xsd.modules.ai.dto.NutritionFillRequest("怎么写代码", null);
+        assertThatThrownBy(() -> svc.fillNutrition(req))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("只能回答");
+        verifyNoInteractions(aiClient);
+    }
+
+    @Test
+    void 菜品估算_黑名单输入_拒绝_不调ai() {
+        var req = new com.yanhuo.xsd.modules.ai.dto.DishEstimateRequest("讲个笑话", null);
+        assertThatThrownBy(() -> svc.estimateDish(req))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("只能回答");
+        verifyNoInteractions(aiClient);
     }
 }
