@@ -43,6 +43,14 @@
         <text class="range">{{ rangeText(detail) }}</text>
       </view>
 
+      <!-- 导出工具条：图片导出 + 分享卡片 -->
+      <view class="export-bar">
+        <view class="exp-btn" :class="{ disabled: exporting }" @click="onExportImage">
+          {{ exporting ? '生成中…' : '导出图片' }}
+        </view>
+        <button class="exp-btn share" open-type="share">分享清单</button>
+      </view>
+
       <view v-if="!detail.items || !detail.items.length" class="empty">该清单暂无采购项</view>
 
       <!-- 按品类分区展示 -->
@@ -93,12 +101,21 @@
     <u-picker :show="showMenuPicker" :columns="[menuNames]" @confirm="onPickMenu" @cancel="showMenuPicker = false" />
     <!-- 菜品选择（点选切换，可多次） -->
     <u-picker :show="showDishPicker" :columns="[dishNames]" @confirm="onPickDish" @cancel="showDishPicker = false" />
+
+    <!-- 离屏画布：用于导出采购清单图片（H5/小程序通用 canvas 2d） -->
+    <canvas
+      canvas-id="shoppingExport"
+      id="shoppingExport"
+      type="2d"
+      class="export-canvas"
+      :style="{ width: canvasW + 'px', height: canvasH + 'px' }"
+    />
   </view>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, reactive } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { onShow, onLoad, onShareAppMessage } from '@dcloudio/uni-app'
 import {
   generate,
   getDetail,
@@ -118,6 +135,9 @@ interface DishLite { id: number; name: string }
 const detail = ref<ShoppingListVO | null>(null)
 const loading = ref(false)
 const generating = ref(false)
+const exporting = ref(false)
+const canvasW = ref(320)
+const canvasH = ref(480)
 
 // 数据源
 const sourceType = ref<ShoppingSourceType>('plan')
@@ -302,6 +322,221 @@ async function onSavePurchase(it: ShoppingItemVO) {
 onShow(() => {
   loadPlans()
 })
+
+// 分享卡片进入：path 带 ?id=xxx 直接打开这份清单
+onLoad((q: any) => {
+  if (q && q.id) {
+    const id = Number(q.id)
+    if (!isNaN(id)) loadDetail(id)
+  }
+})
+
+// 微信小程序卡片分享：title + path(带清单 id，家人点开直达)
+onShareAppMessage(() => {
+  const d = detail.value
+  const id = d?.id
+  const title = d ? `采购清单 · ${rangeText(d)}` : '烟火小食单 · 采购清单'
+  return {
+    title,
+    path: id ? `/pages/shopping/List?id=${id}` : '/pages/shopping/List',
+  }
+})
+
+// ============ 图片导出：canvas 绘制 → canvasToTempFilePath → 保存相册/预览 ============
+
+interface DrawRow { y: number; text: string; sub?: string; done?: boolean; bold?: boolean }
+
+/** 计算画布尺寸 + 行布局（清单名/分区标题/食材+用量+单位+勾选）。 */
+function buildRows(): { rows: DrawRow[]; width: number; height: number } {
+  const d = detail.value
+  const width = 320
+  const pad = 16
+  const rows: DrawRow[] = []
+  rows.push({ y: 0, text: '采购清单', bold: true })
+  if (d) rows.push({ y: 0, text: rangeText(d), sub: '' })
+  let y = 70
+  const grouped = (d?.grouped || {}) as Record<string, ShoppingItemVO[]>
+  Object.keys(grouped).forEach((catKey) => {
+    const items = grouped[catKey] || []
+    if (!items.length) return
+    rows.push({ y, text: categoryName(catKey), bold: true })
+    y += 34
+    items.forEach((it) => {
+      const amt = it.purchaseAmount != null ? `${it.purchaseAmount} ${it.purchaseUnitName || ''}` : (it.referenceGrams ? `约${it.referenceGrams}g` : '')
+      rows.push({ y, text: it.ingredientName || `#${it.ingredientId}`, sub: amt, done: it.purchased === 1 })
+      y += 32
+    })
+    y += 10
+  })
+  const height = Math.max(360, y + pad)
+  // 回填 y（按顺序累加）
+  let acc = 70
+  for (let i = 2; i < rows.length; i++) {
+    const r = rows[i]
+    r.y = acc
+    acc = r.bold ? acc + 34 : acc + 32
+  }
+  return { rows, width, height: height + (rows.length > 2 ? 0 : 0) }
+}
+
+async function onExportImage() {
+  if (exporting.value) return
+  const d = detail.value
+  if (!d || !d.items || !d.items.length) {
+    uni.showToast({ title: '清单为空', icon: 'none' })
+    return
+  }
+  exporting.value = true
+  try {
+    const { rows, width, height } = buildRows()
+    canvasW.value = width
+    canvasH.value = height
+    await nextFrame() // 等 canvas 尺寸生效
+
+    const ctx = uni.createCanvasContext('shoppingExport')
+    // 背景
+    ctx.setFillStyle('#fffaf3')
+    ctx.fillRect(0, 0, width, height)
+    // 标题
+    ctx.setFillStyle('#FF8C42')
+    ctx.setFontSize(18)
+    ctx.fillText('采购清单', 16, 34)
+    if (d) {
+      ctx.setFillStyle('#999')
+      ctx.setFontSize(12)
+      ctx.fillText(rangeText(d), 16, 56)
+    }
+    // 分区/食材
+    rows.forEach((r) => {
+      if (r.y === 0) return // 标题/副标题已在上方画过
+      if (r.bold) {
+        ctx.setFillStyle('#FF8C42')
+        ctx.setFontSize(14)
+        ctx.fillText(r.text, 16, r.y)
+        // 分隔线
+        ctx.setStrokeStyle('#f0e0d0')
+        ctx.beginPath()
+        ctx.moveTo(16, r.y + 6)
+        ctx.lineTo(width - 16, r.y + 6)
+        ctx.stroke()
+      } else {
+        // 勾选框
+        const boxX = 16
+        const boxY = r.y - 11
+        ctx.setStrokeStyle(r.done ? '#FF8C42' : '#ccc')
+        ctx.setLineWidth(1.5)
+        ctx.strokeRect(boxX, boxY, 14, 14)
+        if (r.done) {
+          ctx.setFillStyle('#FF8C42')
+          ctx.fillRect(boxX + 2, boxY + 2, 10, 10)
+        }
+        // 名称 + 用量
+        ctx.setFillStyle(r.done ? '#bbb' : '#333')
+        ctx.setFontSize(14)
+        ctx.fillText(r.text, 38, r.y)
+        if (r.sub) {
+          ctx.setFillStyle('#666')
+          ctx.setFontSize(12)
+          ctx.fillText(r.sub, width - 16 - measureText(ctx, r.sub), r.y)
+        }
+      }
+    })
+    // 底部水印
+    ctx.setFillStyle('#bbb')
+    ctx.setFontSize(10)
+    ctx.fillText('烟火小食单', 16, height - 12)
+
+    await drawSync(ctx)
+    const tempPath = await canvasToTemp('shoppingExport')
+    await saveOrPreview(tempPath)
+  } catch (e: any) {
+    uni.showToast({ title: e?.msg || e?.errMsg || '导出失败', icon: 'none' })
+  } finally {
+    exporting.value = false
+  }
+}
+
+function measureText(ctx: UniApp.CanvasContext, text: string): number {
+  try {
+    const m = ctx.measureText(text)
+    if (m && typeof m.width === 'number') return m.width
+  } catch { /* 降级：粗估 */ }
+  return text.length * 7
+}
+
+/** draw + 回调包成 Promise。 */
+function drawSync(ctx: UniApp.CanvasContext): Promise<void> {
+  return new Promise((resolve, reject) => {
+    ctx.draw(false, () => resolve())
+    // 兜底：draw 回调在部分平台不触发，500ms 后强制放行
+    setTimeout(() => resolve(), 500)
+  })
+}
+
+/** canvasToTempFilePath 包成 Promise。 */
+function canvasToTemp(canvasId: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    uni.canvasToTempFilePath({
+      canvasId,
+      success: (res) => resolve(res.tempFilePath),
+      fail: (err) => reject(err),
+    })
+  })
+}
+
+/** 保存到相册；权限失败则降级预览图片(用户可长按保存)。 */
+async function saveOrPreview(tempPath: string) {
+  // #ifdef MP-WEIXIN || APP-PLUS
+  try {
+    await ensureAlbumAuth()
+    await new Promise<void>((resolve, reject) => {
+      uni.saveImageToPhotosAlbum({
+        filePath: tempPath,
+        success: () => resolve(),
+        fail: (err) => reject(err),
+      })
+    })
+    uni.showToast({ title: '已保存到相册', icon: 'success' })
+    return
+  } catch {
+    // 权限拒绝 → 降级预览
+  }
+  // #endif
+  uni.previewImage({ urls: [tempPath] })
+}
+
+/** 相册写权限：先 getSetting，无则 authorize；被拒抛错。 */
+function ensureAlbumAuth(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    uni.getSetting({
+      success: (res) => {
+        if (res.authSetting['scope.writePhotosAlbum'] === false) {
+          // 曾明确拒绝，引导 openSetting
+          uni.openSetting({
+            success: (r) => {
+              if (r.authSetting['scope.writePhotosAlbum']) resolve()
+              else reject(new Error('未授权相册'))
+            },
+            fail: () => reject(new Error('未授权相册')),
+          })
+        } else if (res.authSetting['scope.writePhotosAlbum'] === true) {
+          resolve()
+        } else {
+          uni.authorize({
+            scope: 'scope.writePhotosAlbum',
+            success: () => resolve(),
+            fail: () => reject(new Error('未授权相册')),
+          })
+        }
+      },
+      fail: () => reject(new Error('读取设置失败')),
+    })
+  })
+}
+
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 50))
+}
 </script>
 
 <style scoped>
@@ -337,4 +572,20 @@ onShow(() => {
 .unit-txt { border: 1px solid #eee; border-radius: 6px; padding: 6px 10px; font-size: 14px; color: #333; }
 .save { font-size: 13px; color: #fff; background: #2a9d8f; padding: 7px 12px; border-radius: 6px; }
 .cur { font-size: 11px; color: #2a9d8f; }
+
+/* 导出工具条 */
+.export-bar { display: flex; gap: 8px; margin: 8px 0 4px; }
+.exp-btn {
+  flex: 1; font-size: 13px; color: #fff; background: #FF8C42;
+  padding: 8px 0; border-radius: 6px; text-align: center; line-height: 1.6;
+  border: none;
+}
+.exp-btn::after { border: none; }
+.exp-btn.share { background: #2a9d8f; }
+.exp-btn.disabled { background: #ccc; }
+
+/* 离屏画布：移出可视区 */
+.export-canvas {
+  position: fixed; left: -9999px; top: 0; pointer-events: none;
+}
 </style>
