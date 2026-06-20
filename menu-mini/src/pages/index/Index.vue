@@ -10,6 +10,7 @@
       <u-button @click="goCreate">录入新菜</u-button>
       <u-button type="warning" @click="goIngredientCreate">录入食材</u-button>
       <u-button type="warning" @click="goAiRecommend">AI 帮我定菜单</u-button>
+      <u-button type="warning" @click="goAiEstimate">AI 估营养</u-button>
       <u-button type="error" @click="onLogout">退出登录</u-button>
     </view>
     <u-picker
@@ -63,6 +64,9 @@ function goIngredientCreate() {
 }
 function goAiRecommend() {
   uni.navigateTo({ url: '/pages/ai/Recommend' })
+}
+function goAiEstimate() {
+  uni.navigateTo({ url: '/pages/ai/Estimate' })
 }
 function onLogout() { auth.logout() }
 </script>

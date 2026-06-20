@@ -71,6 +71,12 @@
 			"style": {
 				"navigationBarTitleText": "AI 帮我定菜单"
 			}
+		},
+		{
+			"path": "pages/ai/Estimate",
+			"style": {
+				"navigationBarTitleText": "AI 估营养"
+			}
 		}
 	],
 	"globalStyle": {

@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yanhuo.xsd.modules.ai.MenuRecommender;
 import com.yanhuo.xsd.modules.ai.dto.CandidateDish;
+import com.yanhuo.xsd.modules.ai.dto.DishEstimateRequest;
+import com.yanhuo.xsd.modules.ai.dto.DishEstimateResponse;
 import com.yanhuo.xsd.modules.ai.dto.MenuCandidate;
 import com.yanhuo.xsd.modules.ai.dto.MenuRecommendRequest;
 import com.yanhuo.xsd.modules.ai.dto.NutritionFillRequest;
@@ -20,6 +22,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
@@ -233,5 +236,60 @@ class DeepSeekAiClientTest {
                 null, null, null, null, null, cands, Map.of());
         var out = client.recommendMenu(req);
         assertThat(out).hasSizeLessThanOrEqualTo(3);
+    }
+
+    // ---------------- 菜品/一餐营养估算 ----------------
+
+    @Test
+    void 菜品估算_解析deepseek返回() throws Exception {
+        stubContent("{\"calorie\":350,\"protein\":18,\"fat\":12,\"carb\":20,\"sugar\":6,"
+                + "\"note\":\"按2蛋2番茄家常份量估算\"}");
+        var r = client.estimateDish(new DishEstimateRequest("一盘番茄炒蛋,2个鸡蛋2个番茄", null));
+        assertThat(r.source()).isEqualTo("deepseek");
+        assertThat(r.description()).isEqualTo("一盘番茄炒蛋,2个鸡蛋2个番茄");
+        assertThat(r.nutrition()).hasSize(5);
+        assertThat(r.nutrition().get(1L)).isEqualByComparingTo("350");   // calorie
+        assertThat(r.nutrition().get(2L)).isEqualByComparingTo("18");    // protein
+        assertThat(r.nutrition().get(5L)).isEqualByComparingTo("6");     // sugar
+        assertThat(r.aiNote()).contains("番茄");
+        verifyNoInteractions(mockFallback);
+    }
+
+    @Test
+    void 菜品估算_servingFactor缩放() throws Exception {
+        stubContent("{\"calorie\":400,\"protein\":20,\"fat\":10,\"carb\":40,\"sugar\":5,"
+                + "\"note\":\"一份\"}");
+        var r = client.estimateDish(
+                new DishEstimateRequest("一碗牛肉面", new BigDecimal("2")));
+        assertThat(r.source()).isEqualTo("deepseek");
+        // calorie 400 × 2 = 800
+        assertThat(r.nutrition().get(1L)).isEqualByComparingTo("800");
+        assertThat(r.nutrition().get(2L)).isEqualByComparingTo("40");
+    }
+
+    @Test
+    void 菜品估算_key为空_降级mock() {
+        ReflectionTestUtils.setField(client, "key", "");
+        var mockResp = new DishEstimateResponse("x", Map.of(), "mock", "mock");
+        when(mockFallback.estimateDish(any())).thenReturn(mockResp);
+        var r = client.estimateDish(new DishEstimateRequest("一碗牛肉面", null));
+        assertThat(r.source()).isEqualTo("mock");
+        verifyNoInteractions(restClient);
+    }
+
+    @Test
+    void 菜品估算_网络失败_降级mock() {
+        when(responseSpec.body(JsonNode.class)).thenThrow(new RuntimeException("connect refused"));
+        var mockResp = new DishEstimateResponse("x", Map.of(), "mock", "mock");
+        when(mockFallback.estimateDish(any())).thenReturn(mockResp);
+        var r = client.estimateDish(new DishEstimateRequest("一碗牛肉面", null));
+        assertThat(r.source()).isEqualTo("mock");
+    }
+
+    @Test
+    void 菜品估算_描述为空_抛BizException() {
+        assertThatThrownBy(() -> client.estimateDish(new DishEstimateRequest("", null)))
+                .isInstanceOf(com.yanhuo.xsd.common.BizException.class);
+        verifyNoInteractions(restClient);
     }
 }

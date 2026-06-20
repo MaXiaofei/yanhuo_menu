@@ -2,6 +2,8 @@ package com.yanhuo.xsd.modules.ai.impl;
 
 import com.yanhuo.xsd.common.BizException;
 import com.yanhuo.xsd.modules.ai.AiClient;
+import com.yanhuo.xsd.modules.ai.dto.DishEstimateRequest;
+import com.yanhuo.xsd.modules.ai.dto.DishEstimateResponse;
 import com.yanhuo.xsd.modules.ai.dto.MenuCandidate;
 import com.yanhuo.xsd.modules.ai.dto.MenuRecommendRequest;
 import com.yanhuo.xsd.modules.ai.dto.NutritionFillRequest;
@@ -30,6 +32,11 @@ public class GlmAiClient implements AiClient {
 
     @Override
     public List<MenuCandidate> recommendMenu(MenuRecommendRequest req) {
+        throw new BizException(NOT_READY);
+    }
+
+    @Override
+    public DishEstimateResponse estimateDish(DishEstimateRequest req) {
         throw new BizException(NOT_READY);
     }
 

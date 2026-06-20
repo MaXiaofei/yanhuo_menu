@@ -6,6 +6,8 @@ import com.yanhuo.xsd.common.BizException;
 import com.yanhuo.xsd.modules.ai.AiClient;
 import com.yanhuo.xsd.modules.ai.MenuRecommender;
 import com.yanhuo.xsd.modules.ai.dto.CandidateDish;
+import com.yanhuo.xsd.modules.ai.dto.DishEstimateRequest;
+import com.yanhuo.xsd.modules.ai.dto.DishEstimateResponse;
 import com.yanhuo.xsd.modules.ai.dto.MenuCandidate;
 import com.yanhuo.xsd.modules.ai.dto.MenuRecommendRequest;
 import com.yanhuo.xsd.modules.ai.dto.NutritionFillRequest;
@@ -189,6 +191,50 @@ public class DeepSeekAiClient implements AiClient {
             log.warn("DeepSeek recommendMenu 失败，降级规则: {}", e.getMessage());
             return ruleFallback(req);
         }
+    }
+
+    // ---------------- 菜品/一餐营养估算（V2 方案2：纯文本描述） ----------------
+
+    @Override
+    public DishEstimateResponse estimateDish(DishEstimateRequest req) {
+        if (req.description() == null || req.description().isBlank()) {
+            throw new BizException("菜品描述不能为空");
+        }
+        try {
+            if (key == null || key.isBlank()) {
+                throw new BizException("API_KEY 未配置，降级 mock");
+            }
+            BigDecimal factor = req.servingFactor() == null ? BigDecimal.ONE : req.servingFactor();
+            String user = "菜品/一餐描述：" + req.description()
+                    + "\n份数(servingFactor)：" + factor;
+            String content = chat(
+                    "你是营养师。根据用户对一道菜/一餐的文字描述，估算其总营养成分。"
+                            + "返回 JSON:{\"calorie\":数值,\"protein\":数值,\"fat\":数值,"
+                            + "\"carb\":数值,\"sugar\":数值,\"note\":\"简要说明估算依据\"}。"
+                            + "数值是该餐总量(不是per100g)，已考虑用户给的份数。只返回JSON。",
+                    user);
+            JsonNode node = parseJson(content);
+            // metricId 1cal/2protein/3fat/4carb/5sugar；gi 不适用整体餐，跳过
+            Map<Long, BigDecimal> nutrition = new LinkedHashMap<>();
+            nutrition.put(1L, scale(toBd(node.path("calorie")), factor));
+            nutrition.put(2L, scale(toBd(node.path("protein")), factor));
+            nutrition.put(3L, scale(toBd(node.path("fat")), factor));
+            nutrition.put(4L, scale(toBd(node.path("carb")), factor));
+            nutrition.put(5L, scale(toBd(node.path("sugar")), factor));
+            String note = node.path("note").asText("估算基于常见份量,仅供参考");
+            return new DishEstimateResponse(req.description(), nutrition, SOURCE, note);
+        } catch (Exception e) {
+            log.warn("DeepSeek estimateDish 失败，降级 mock: {}", e.getMessage());
+            return mockFallback.estimateDish(req);
+        }
+    }
+
+    /** value × factor（factor=1 时原样返回，保留 AI 给的精度）。 */
+    private static BigDecimal scale(BigDecimal value, BigDecimal factor) {
+        if (value == null) return BigDecimal.ZERO;
+        if (factor == null || factor.compareTo(BigDecimal.ONE) == 0) return value;
+        return value.multiply(factor).setScale(2, java.math.RoundingMode.HALF_UP)
+                .stripTrailingZeros();
     }
 
     /** 规则降级：用 MenuRecommender 在候选池上过滤/打分/组合。 */

@@ -1,6 +1,8 @@
 package com.yanhuo.xsd.modules.ai;
 
 import com.yanhuo.xsd.common.BizException;
+import com.yanhuo.xsd.modules.ai.dto.DishEstimateRequest;
+import com.yanhuo.xsd.modules.ai.dto.DishEstimateResponse;
 import com.yanhuo.xsd.modules.ai.dto.NutritionFillRequest;
 import com.yanhuo.xsd.modules.ai.dto.NutritionFillResponse;
 import com.yanhuo.xsd.modules.ai.impl.MockAiClient;
@@ -99,6 +101,45 @@ class MockAiClientTest {
     @Test
     void 无匹配_抛BizException() {
         assertThatThrownBy(() -> c.fillNutrition(new NutritionFillRequest("qqq无意义zzz", null)))
+                .isInstanceOf(BizException.class);
+    }
+
+    // ---------------- 菜品/一餐营养估算（mock） ----------------
+
+    @Test
+    void 菜品估算_命中关键词_番茄鸡蛋() {
+        var r = c.estimateDish(new DishEstimateRequest("一盘番茄炒蛋,2个鸡蛋2个番茄", null));
+        assertThat(r.source()).isEqualTo("mock");
+        assertThat(r.nutrition()).hasSize(5);
+        // 必有 metricId 1cal/2protein/3fat/4carb/5sugar
+        assertThat(r.nutrition().keySet()).containsExactlyInAnyOrder(1L, 2L, 3L, 4L, 5L);
+        // 番茄 200g + 鸡蛋 100g：calorie = 19*2 + 144*1 = 182，应 > 0
+        assertThat(r.nutrition().get(1L).doubleValue()).isPositive();
+        // aiNote 含 mock 提示
+        assertThat(r.aiNote()).contains("mock");
+    }
+
+    @Test
+    void 菜品估算_无关键词_兜底家常菜() {
+        var r = c.estimateDish(new DishEstimateRequest("一顿饭", null));
+        assertThat(r.source()).isEqualTo("mock");
+        // 兜底按家常菜 calorie≈400
+        assertThat(r.nutrition().get(1L)).isEqualByComparingTo("400");
+    }
+
+    @Test
+    void 菜品估算_servingFactor缩放() {
+        var base = c.estimateDish(new DishEstimateRequest("一碗牛肉面", null));
+        var doub = c.estimateDish(new DishEstimateRequest("一碗牛肉面", new BigDecimal("2")));
+        // 双份 calorie ≈ 单份 × 2
+        assertThat(doub.nutrition().get(1L).doubleValue())
+                .isCloseTo(base.nutrition().get(1L).doubleValue() * 2,
+                        org.assertj.core.data.Offset.offset(2.0));
+    }
+
+    @Test
+    void 菜品估算_描述为空_抛BizException() {
+        assertThatThrownBy(() -> c.estimateDish(new DishEstimateRequest("", null)))
                 .isInstanceOf(BizException.class);
     }
 }

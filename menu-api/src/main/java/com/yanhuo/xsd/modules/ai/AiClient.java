@@ -1,5 +1,7 @@
 package com.yanhuo.xsd.modules.ai;
 
+import com.yanhuo.xsd.modules.ai.dto.DishEstimateRequest;
+import com.yanhuo.xsd.modules.ai.dto.DishEstimateResponse;
 import com.yanhuo.xsd.modules.ai.dto.MenuCandidate;
 import com.yanhuo.xsd.modules.ai.dto.MenuRecommendRequest;
 import com.yanhuo.xsd.modules.ai.dto.NutritionFillRequest;
@@ -20,6 +22,9 @@ public interface AiClient {
 
     /** 菜单推荐：基于候选菜池 + 健康约束 + 预算，输出若干组候选菜单。 */
     List<MenuCandidate> recommendMenu(MenuRecommendRequest req);
+
+    /** 菜品/一餐营养估算：根据文字描述估算该餐总营养（V2 方案2，纯文本）。 */
+    DishEstimateResponse estimateDish(DishEstimateRequest req);
 
     /** provider 标识（mock/glm），用于日志与来源标注。 */
     default String provider() {

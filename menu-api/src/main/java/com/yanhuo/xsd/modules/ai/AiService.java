@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.yanhuo.xsd.common.BizException;
 import com.yanhuo.xsd.modules.ai.MenuRecommender.Constraints;
 import com.yanhuo.xsd.modules.ai.dto.CandidateDish;
+import com.yanhuo.xsd.modules.ai.dto.DishEstimateRequest;
+import com.yanhuo.xsd.modules.ai.dto.DishEstimateResponse;
 import com.yanhuo.xsd.modules.ai.dto.MenuCandidate;
 import com.yanhuo.xsd.modules.ai.dto.MenuRecommendRequest;
 import com.yanhuo.xsd.modules.ai.dto.NutritionFillRequest;
@@ -155,6 +157,28 @@ public class AiService {
             throw e;
         } catch (RuntimeException e) {
             logCall("menu_recommend", req.memberId(), reqJson, null,
+                    0, 0, BigDecimal.ZERO, aiClient.provider(), "fail", e.getMessage(), start);
+            throw e;
+        }
+    }
+
+    // ---------------- 菜品/一餐营养估算 ----------------
+
+    public DishEstimateResponse estimateDish(DishEstimateRequest req) {
+        long start = System.currentTimeMillis();
+        Long memberId = null; // 整体餐估算无 member 维度，预留
+        String reqJson = safeJson(req);
+        try {
+            DishEstimateResponse resp = aiClient.estimateDish(req);
+            logCall("dish_estimate", memberId, reqJson, safeJson(resp),
+                    0, 0, BigDecimal.ZERO, aiClient.provider(), "ok", null, start);
+            return resp;
+        } catch (BizException e) {
+            logCall("dish_estimate", memberId, reqJson, null,
+                    0, 0, BigDecimal.ZERO, aiClient.provider(), "fail", e.getMessage(), start);
+            throw e;
+        } catch (RuntimeException e) {
+            logCall("dish_estimate", memberId, reqJson, null,
                     0, 0, BigDecimal.ZERO, aiClient.provider(), "fail", e.getMessage(), start);
             throw e;
         }

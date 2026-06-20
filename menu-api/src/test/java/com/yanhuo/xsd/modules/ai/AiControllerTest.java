@@ -1,6 +1,8 @@
 package com.yanhuo.xsd.modules.ai;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yanhuo.xsd.modules.ai.dto.DishEstimateRequest;
+import com.yanhuo.xsd.modules.ai.dto.DishEstimateResponse;
 import com.yanhuo.xsd.modules.ai.dto.MenuCandidate;
 import com.yanhuo.xsd.modules.ai.dto.MenuRecommendRequest;
 import com.yanhuo.xsd.modules.ai.dto.NutritionFillRequest;
@@ -100,6 +102,25 @@ class AiControllerTest {
                 .andExpect(jsonPath("$.data[0].totalPrice").value(10))
                 .andExpect(jsonPath("$.data[0].source").value("mock"))
                 .andExpect(jsonPath("$.data[0].reasons[0]").value("蛋白高"));
+    }
+
+    @Test
+    void 菜品估算_返回R结构_含nutrition与source() throws Exception {
+        Map<Long, BigDecimal> nutrition = new java.util.LinkedHashMap<>();
+        nutrition.put(1L, new BigDecimal("350"));
+        nutrition.put(2L, new BigDecimal("18"));
+        DishEstimateResponse resp = new DishEstimateResponse(
+                "一盘番茄炒蛋", nutrition, "deepseek", "按家常份量估算");
+        given(svc.estimateDish(any(DishEstimateRequest.class))).willReturn(resp);
+
+        String body = "{\"description\":\"一盘番茄炒蛋\",\"servingFactor\":1}";
+        mvc.perform(post("/ai/dish/estimate").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.source").value("deepseek"))
+                .andExpect(jsonPath("$.data.description").value("一盘番茄炒蛋"))
+                .andExpect(jsonPath("$.data.nutrition['1']").value(350))
+                .andExpect(jsonPath("$.data.aiNote").value("按家常份量估算"));
     }
 
     private static IngredientNutrition nut(Long metricId, String val) {

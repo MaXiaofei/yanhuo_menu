@@ -1,6 +1,8 @@
 package com.yanhuo.xsd.modules.ai;
 
 import com.yanhuo.xsd.common.R;
+import com.yanhuo.xsd.modules.ai.dto.DishEstimateRequest;
+import com.yanhuo.xsd.modules.ai.dto.DishEstimateResponse;
 import com.yanhuo.xsd.modules.ai.dto.MenuCandidate;
 import com.yanhuo.xsd.modules.ai.dto.MenuRecommendRequest;
 import com.yanhuo.xsd.modules.ai.dto.NutritionFillRequest;
@@ -36,5 +38,12 @@ public class AiController {
     @MpPerm("ai.use")
     public R<List<MenuCandidate>> recommendMenu(@RequestBody MenuRecommendRequest req) {
         return R.ok(svc.recommendMenu(req));
+    }
+
+    /** 菜品/一餐营养估算：文字描述 → AI 估算该餐总营养（V2 方案2，纯文本）。 */
+    @PostMapping("/dish/estimate")
+    @MpPerm("ai.use")
+    public R<DishEstimateResponse> estimateDish(@RequestBody DishEstimateRequest req) {
+        return R.ok(svc.estimateDish(req));
     }
 }

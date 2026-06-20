@@ -41,3 +41,20 @@ export const aiRecommendMenu = (params: {
   maxMinutes?: number
   maxDifficulty?: number
 }) => request<AiRecommendGroup[]>({ url: '/ai/menu/recommend', method: 'POST', data: { ...params } })
+
+// V2 方案2：文字描述 → AI 估算该餐总营养
+export interface AiDishEstimateResult {
+  description: string
+  /** metricId(数字) -> 估算总量 */
+  nutrition: Record<string, number>
+  source: string // "deepseek" | "mock"
+  aiNote: string
+}
+
+/** AI 估算菜品/一餐营养：文字描述（如"一盘番茄炒蛋,2个鸡蛋2个番茄"）+ 份数 → 总营养 */
+export const aiEstimateDish = (description: string, servingFactor?: number) =>
+  request<AiDishEstimateResult>({
+    url: '/ai/dish/estimate',
+    method: 'POST',
+    data: servingFactor ? { description, servingFactor } : { description },
+  })

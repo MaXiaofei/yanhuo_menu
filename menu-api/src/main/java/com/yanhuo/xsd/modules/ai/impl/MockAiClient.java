@@ -4,6 +4,8 @@ import com.yanhuo.xsd.common.BizException;
 import com.yanhuo.xsd.modules.ai.AiClient;
 import com.yanhuo.xsd.modules.ai.MenuRecommender;
 import com.yanhuo.xsd.modules.ai.dto.CandidateDish;
+import com.yanhuo.xsd.modules.ai.dto.DishEstimateRequest;
+import com.yanhuo.xsd.modules.ai.dto.DishEstimateResponse;
 import com.yanhuo.xsd.modules.ai.dto.MenuCandidate;
 import com.yanhuo.xsd.modules.ai.dto.MenuRecommendRequest;
 import com.yanhuo.xsd.modules.ai.dto.NutritionFillRequest;
@@ -13,6 +15,7 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -108,6 +111,75 @@ public class MockAiClient implements AiClient {
         if (o instanceof BigDecimal b) return b;
         if (o instanceof Number n) return BigDecimal.valueOf(n.doubleValue());
         try { return new BigDecimal(o.toString().trim()); } catch (Exception e) { return null; }
+    }
+
+    // ---------------- 菜品/一餐营养估算（mock 兜底） ----------------
+
+    /**
+     * mock 菜品营养估算：从描述提取食材关键词，按关键词表 per100g × 经验份量(克)累加，
+     * 最后按 servingFactor 缩放。粗略估算，仅作 DeepSeek 失败兜底。
+     *
+     * <p>metricId 1cal/2protein/3fat/4carb/5sugar（gi 不适用整体餐，跳过）。
+     */
+    @Override
+    public DishEstimateResponse estimateDish(DishEstimateRequest req) {
+        if (req.description() == null || req.description().isBlank()) {
+            throw new BizException("菜品描述不能为空");
+        }
+        BigDecimal factor = req.servingFactor() == null ? BigDecimal.ONE : req.servingFactor();
+        // 累加各食材贡献：cal/protein/fat/carb/sugar（各指标先按 per100g × 克数/100 累加）
+        double[] total = new double[5];
+        boolean matched = false;
+        for (Map.Entry<String, double[]> e : TABLE.entrySet()) {
+            if (req.description().contains(e.getKey())) {
+                double[] v = e.getValue();
+                double grams = guessGrams(e.getKey());
+                double scale = grams / 100.0;
+                total[0] += v[0] * scale;  // calorie
+                total[1] += v[1] * scale;  // protein
+                total[2] += v[2] * scale;  // fat
+                total[3] += v[3] * scale;  // carb
+                total[4] += v[4] * scale;  // sugar
+                matched = true;
+            }
+        }
+        // 兜底：描述里没命中关键词表 → 用分类模板按一道家常菜估（约 400kcal）
+        if (!matched) {
+            double[] base = {400, 18, 15, 40, 6};
+            for (int i = 0; i < 5; i++) total[i] = base[i];
+        }
+        Map<Long, BigDecimal> nutrition = new HashMap<>();
+        for (int i = 0; i < 5; i++) {
+            BigDecimal val = BigDecimal.valueOf(total[i] * factor.doubleValue())
+                    .setScale(1, java.math.RoundingMode.HALF_UP)
+                    .stripTrailingZeros();
+            nutrition.put((long) (i + 1), val);
+        }
+        return new DishEstimateResponse(req.description(), nutrition, SOURCE,
+                "mock 估算（按关键词经验份量），接入 DeepSeek 后更精确");
+    }
+
+    /** 关键词 → 经验克数（一道家常菜的常见份量，粗略）。 */
+    private static double guessGrams(String key) {
+        switch (key) {
+            case "米饭": return 200;
+            case "面条": return 150;
+            case "牛奶": return 250;
+            case "苹果": return 200;
+            case "鸡蛋": return 100;       // 2 个约 100g
+            case "番茄":
+            case "西红柿": return 200;     // 2 个约 200g
+            case "豆腐": return 150;
+            case "土豆": return 150;
+            case "猪肉":
+            case "牛肉":
+            case "鸡胸":
+            case "草鱼": return 100;       // 肉类一道约 100g
+            case "虾": return 80;
+            case "黄瓜":
+            case "白菜": return 150;
+            default: return 100;
+        }
     }
 
     @Override
