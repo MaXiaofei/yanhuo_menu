@@ -18,7 +18,8 @@ const total = ref(0)
 const pageNum = ref(1)
 const pageSize = 10
 
-const ingredients = ref<{ id: number; name: string }[]>([])
+// 食材下拉项需含 unitId，选食材后自动带入单位（默认带，允许调）
+const ingredients = ref<{ id: number; name: string; unitId: number }[]>([])
 const unitOptions = ref<DictItem[]>([])
 
 async function load() {
@@ -39,8 +40,15 @@ function onPageChange(p: number) {
 
 async function loadOptions() {
   const [ings, units] = await Promise.all([listIngredients(), listByGroup('unit')])
-  ingredients.value = ings.map((x) => ({ id: x.id, name: x.name }))
+  ingredients.value = ings.map((x) => ({ id: x.id, name: x.name, unitId: x.unitId }))
   unitOptions.value = units
+}
+
+// 选食材后，按该食材的 unitId 自动带入单位（默认带，仍允许手改）
+function onIngredientChange(ingredientId?: number) {
+  if (ingredientId == null) return
+  const ing = ingredients.value.find((x) => x.id === ingredientId)
+  if (ing) form.unitId = ing.unitId
 }
 
 onMounted(() => {
@@ -190,7 +198,7 @@ const tableRowClass = ({ row }: { row: PantryVO }) => {
     <el-dialog v-model="dialogVisible" :title="editing ? '编辑库存' : '新增库存'" width="520px">
       <el-form label-width="90px">
         <el-form-item label="食材">
-          <el-select v-model="form.ingredientId" filterable placeholder="选择食材" style="width: 100%">
+          <el-select v-model="form.ingredientId" filterable placeholder="选择食材" style="width: 100%" @change="onIngredientChange">
             <el-option
               v-for="i in ingredients"
               :key="i.id"
@@ -203,7 +211,7 @@ const tableRowClass = ({ row }: { row: PantryVO }) => {
           <el-input-number v-model="form.amount" :min="0" :precision="2" />
         </el-form-item>
         <el-form-item label="单位">
-          <el-select v-model="form.unitId" clearable placeholder="选择单位" style="width: 100%">
+          <el-select v-model="form.unitId" clearable placeholder="选食材后自动带入" style="width: 100%">
             <el-option
               v-for="u in unitOptions"
               :key="u.id"
@@ -211,6 +219,7 @@ const tableRowClass = ({ row }: { row: PantryVO }) => {
               :value="u.id"
             />
           </el-select>
+          <span class="mini" style="margin-left: 8px">随食材自动带入，可手改</span>
         </el-form-item>
         <el-form-item label="过期日">
           <el-date-picker
