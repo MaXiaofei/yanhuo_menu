@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Brush, ArrowDown, SwitchButton } from '@element-plus/icons-vue'
@@ -16,17 +17,34 @@ interface MenuEntry {
   icon: string
 }
 
-const menus: MenuEntry[] = [
-  { path: '/dict', title: '配置中心', icon: 'Setting' },
-  { path: '/member', title: '家庭成员', icon: 'User' },
-  { path: '/ingredient', title: '食材库', icon: 'Apple' },
-  { path: '/dish', title: '菜品', icon: 'Food' },
-  { path: '/menu', title: '菜单', icon: 'List' },
-  { path: '/mealplan', title: '周计划', icon: 'Calendar' },
-  { path: '/pantry', title: '食材库存', icon: 'Box' },
-  { path: '/shopping', title: '采购清单', icon: 'ShoppingCart' },
-  { path: '/backup', title: '数据备份', icon: 'FolderOpened' },
-]
+// icon 与路由的视觉映射，路径 -> 图标组件名
+const iconByPath: Record<string, string> = {
+  '/dict': 'Setting',
+  '/member': 'User',
+  '/ingredient': 'Apple',
+  '/dish': 'Food',
+  '/menu': 'List',
+  '/mealplan': 'Calendar',
+  '/pantry': 'Box',
+  '/shopping': 'ShoppingCart',
+  '/backup': 'FolderOpened',
+}
+
+// 菜单由路由表驱动：取 layout 子路由，跳过 meta.hidden（日常操作页入口隐藏），home 不进菜单
+const menus = computed<MenuEntry[]>(() => {
+  const layoutRoute = router.options.routes.find((r) => r.path === '/')
+  const children = (layoutRoute?.children ?? []) as Array<{
+    path: string
+    meta?: { title?: string; hidden?: boolean }
+  }>
+  return children
+    .filter((c) => c.path !== 'home' && !c.meta?.hidden)
+    .map<MenuEntry>((c) => ({
+      path: `/${c.path}`,
+      title: c.meta?.title ?? c.path,
+      icon: iconByPath[`/${c.path}`] ?? 'Menu',
+    }))
+})
 
 async function onLogout() {
   await authStore.logout()

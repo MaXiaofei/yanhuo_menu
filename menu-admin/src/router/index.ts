@@ -46,13 +46,14 @@ const routes: RouteRecordRaw[] = [
         path: 'menu',
         name: 'Menu',
         component: () => import('@/views/menu/Index.vue'),
-        meta: { title: '菜单' },
+        // 后台定位为管理辅助，菜单/采购/周计划等日常操作入口隐藏（路由保留，直接访问 URL 仍可达）
+        meta: { title: '菜单', hidden: true },
       },
       {
         path: 'mealplan',
         name: 'MealPlan',
         component: () => import('@/views/mealplan/Index.vue'),
-        meta: { title: '周计划' },
+        meta: { title: '周计划', hidden: true },
       },
       {
         path: 'pantry',
@@ -64,7 +65,7 @@ const routes: RouteRecordRaw[] = [
         path: 'shopping',
         name: 'Shopping',
         component: () => import('@/views/shopping/Index.vue'),
-        meta: { title: '采购清单' },
+        meta: { title: '采购清单', hidden: true },
       },
       {
         path: 'backup',
