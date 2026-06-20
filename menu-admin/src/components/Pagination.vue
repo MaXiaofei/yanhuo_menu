@@ -12,7 +12,7 @@ const props = withDefaults(
     pageSize?: number
   }>(),
   {
-    pageSize: 10,
+    pageSize: 20,
   },
 )
 

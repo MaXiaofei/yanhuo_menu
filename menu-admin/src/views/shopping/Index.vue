@@ -26,7 +26,7 @@ const loading = ref(false)
 const list = ref<ShoppingList[]>([])
 const total = ref(0)
 const pageNum = ref(1)
-const pageSize = 10
+const pageSize = 20
 
 async function load() {
   loading.value = true

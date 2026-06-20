@@ -17,7 +17,7 @@ const loading = ref(false)
 const list = ref<PantryVO[]>([])
 const total = ref(0)
 const pageNum = ref(1)
-const pageSize = 10
+const pageSize = 20
 
 // 食材下拉项需含 unitId，选食材后自动带入单位（默认带，允许调）
 const ingredients = ref<{ id: number; name: string; unitId: number }[]>([])
