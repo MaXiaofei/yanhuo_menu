@@ -1,135 +1,127 @@
 <template>
   <view class="page">
-    <!-- 顶栏：左「小食单」右齿轮（跳设置） -->
+    <!-- 顶栏 -->
     <view class="topbar">
-      <text class="brand">小食单</text>
-      <text class="gear" @click="goSettings">⚙</text>
+      <text class="back" @click="goBack">‹</text>
+      <text class="top-title">今日</text>
+      <view class="back"></view>
     </view>
 
-    <!-- 第一区：家里有啥（横滑食材） -->
-    <view class="section-title" @click="goPantry">
-      <text>家里有啥</text>
-      <text class="arrow">→</text>
+    <!-- 问候区 -->
+    <view class="greeting">
+      <text class="hi">{{ greeting }}，{{ memberName }} 👋</text>
+      <text class="quote">{{ todayQuote }}</text>
     </view>
-    <scroll-view scroll-x class="pantry-scroll" :show-scrollbar="false">
-      <view v-if="pantryLoading" class="ph">加载中…</view>
-      <view v-else-if="!pantry.length" class="ph" @click="goPantry">冰箱空了，去买点啥吧</view>
-      <view v-else class="pantry-row">
-        <view v-for="p in pantry" :key="p.id" :class="['p-card', pantryTagClass(p)]">
-          <text class="p-name">{{ p.ingredientName || ('#' + p.ingredientId) }}</text>
-          <text class="p-tag">{{ pantryTagText(p) }}</text>
+
+    <!-- 金句横滑轮播 -->
+    <scroll-view scroll-x class="quote-scroll" :show-scrollbar="false">
+      <view class="quote-row">
+        <view
+          v-for="(q, i) in quotes"
+          :key="i"
+          :class="['quote-card', q.includes('烟火') ? 'hot' : '']"
+        >
+          <text class="q-mark">"</text>
+          <text class="q-text">{{ q }}</text>
+          <text class="q-mark-end">"</text>
         </view>
       </view>
     </scroll-view>
 
-    <!-- 第二区：操作（算热量 / 换个推荐） -->
-    <view class="actions">
-      <button class="btn-ghost half" @click="goEstimate">🔥 算热量</button>
-      <button class="btn-primary half" @click="onRecommend" :disabled="recommending">
-        {{ recommending ? '推荐中…' : '🤖 换个推荐' }}
-      </button>
+    <!-- 今日推荐卡（渐变底） -->
+    <view class="recommend-card" @click="onRecommend">
+      <view class="rec-head">
+        <text class="rec-flame">🔥</text>
+        <text class="rec-label">今日推荐</text>
+      </view>
+      <text class="rec-title">今天给全家做点啥？</text>
+      <text class="rec-sub">{{ recommending ? 'AI 想菜中…' : '打开 AI 帮你换换灵感 →' }}</text>
     </view>
 
-    <!-- 第三区：根据家里的菜，这些能做 -->
-    <view class="section-title">
-      <text>根据家里的菜，这些能做</text>
+    <!-- 功能宫格 -->
+    <view class="block-title">
+      <view class="tbar"></view>
+      <text>常用功能</text>
     </view>
-    <view v-if="dishLoading" class="empty">找菜中…</view>
-    <view v-else-if="!matches.length" class="empty">家里这些菜还没匹配到菜谱，试试手动搜搜</view>
-    <view v-else>
-      <view v-for="m in matches" :key="m.dish.id" class="card dish-card" @click="goDetail(m.dish.id)">
-        <view class="d-name">
-          {{ m.dish.name }}
-          <text v-if="m.canMake" class="badge-ok">能做</text>
-          <text v-else class="badge-mid">差{{ m.missingIngredients.length }}样</text>
-        </view>
-        <view class="d-meta">
-          <text class="meta-item">用料 {{ m.totalCount }} 种</text>
-          <text class="meta-item">难度 {{ difficultyText(m.dish.difficulty) }}</text>
-          <text v-if="minutes(m.dish)" class="meta-item">{{ minutes(m.dish) }} 分钟</text>
-        </view>
-        <view v-if="m.missingIngredients && m.missingIngredients.length" class="d-missing">
-          还差：{{ m.missingIngredients.join('、') }}
-        </view>
+    <view class="grid">
+      <view class="grid-cell" @click="go('/pages/dish/List')">
+        <view class="cell-ico" style="background: rgba(255,159,90,0.15); color:#FF9F5A;">📖</view>
+        <text class="cell-name">菜库</text>
       </view>
-      <view class="more" @click="goFind">查看更多 / 手动选食材 →</view>
+      <view class="grid-cell" @click="go('/pages/pantry/List')">
+        <view class="cell-ico" style="background: rgba(111,191,142,0.15); color:#6FBF8E;">🧊</view>
+        <text class="cell-name">食材库存</text>
+      </view>
+      <view class="grid-cell" @click="go('/pages/mealplan/Calendar')">
+        <view class="cell-ico" style="background: rgba(107,168,232,0.15); color:#6BA8E8;">📅</view>
+        <text class="cell-name">周计划</text>
+      </view>
+      <view class="grid-cell" @click="go('/pages/shopping/List')">
+        <view class="cell-ico" style="background: rgba(232,163,61,0.15); color:#E8A33D;">🛒</view>
+        <text class="cell-name">采购清单</text>
+      </view>
+      <view class="grid-cell" @click="go('/pages/dailylog/Index')">
+        <view class="cell-ico" style="background: rgba(176,123,216,0.15); color:#B07BD8;">📝</view>
+        <text class="cell-name">饮食记录</text>
+      </view>
+      <view class="grid-cell" @click="go('/pages/ai/Recommend')">
+        <view class="cell-ico" style="background: rgba(224,123,123,0.15); color:#E07B7B;">✨</view>
+        <text class="cell-name">AI 帮我</text>
+      </view>
     </view>
+
+    <view style="height: 60rpx;"></view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { listPantry, type PantryVO } from '@/api/pantry'
-import { findDishesByIngredients, type DishMatch } from '@/api/dish'
+import { useMemberStore } from '@/store/member'
 import { aiRecommendMenu } from '@/api/ai'
 
-const pantry = ref<PantryVO[]>([])
-const pantryLoading = ref(false)
-const matches = ref<DishMatch[]>([])
-const dishLoading = ref(false)
+const m = useMemberStore()
+const memberName = computed(() => {
+  const cur = m.members.find((x: any) => x.id === m.currentId)
+  return cur?.name || '掌勺人'
+})
 const recommending = ref(false)
 
-function daysBetween(expire?: string): number | null {
-  if (!expire) return null
-  const today = new Date().toISOString().slice(0, 10)
-  return Math.ceil((new Date(expire).getTime() - new Date(today).getTime()) / 86400000)
-}
+const greeting = computed(() => {
+  const h = new Date().getHours()
+  if (h < 6) return '夜深了'
+  if (h < 11) return '早安'
+  if (h < 14) return '午安'
+  if (h < 18) return '下午好'
+  return '晚上好'
+})
 
-/** 食材标签文本：临期「剩N天」、不足「偏少」、其他「充足」。 */
-function pantryTagText(p: PantryVO): string {
-  const d = daysBetween(p.expireDate)
-  if (d !== null && d < 0) return `过期${-d}天`
-  if (d !== null && d <= 3) return `剩${d}天`
-  if (!!p.lowThreshold && Number(p.lowThreshold) > 0 && Number(p.amount) < Number(p.lowThreshold)) return '偏少'
-  return '充足'
-}
-function pantryTagClass(p: PantryVO): string {
-  const t = pantryTagText(p)
-  if (t.startsWith('过期')) return 'p-danger'
-  if (t.startsWith('剩')) return 'p-warn'
-  if (t === '偏少') return 'p-warn'
-  return 'p-ok'
-}
+const quotes = [
+  '一日三餐，是家人之间最朴素的约定',
+  '厨房里的烟火，是生活最真实的模样',
+  '每一道菜，都藏着对家人的爱',
+  '做饭不难，难的是日复一日的坚持',
+  '最好的味道，永远是家的味道',
+  '厨房是家的心脏，锅碗瓢盆是它的心跳',
+  '把爱揉进面团，把暖熬进汤里',
+  '一家人围着桌子，就是最好的时光',
+  '今天吃什么，是全世界最难的问题',
+  '冰箱里的食材，是明天早餐的开始',
+  '火候到了，味道自然就来了',
+  '调味的手感，是无数次尝试后的本能',
+  '剩下的饭菜，明天热一热还是家的味道',
+  '掌勺的人，是家里最温柔的英雄',
+]
+const todayQuote = computed(() => {
+  const day = Math.floor((Date.now() - new Date(2026, 0, 1).getTime()) / 86400000)
+  return quotes[((day % quotes.length) + quotes.length) % quotes.length]
+})
 
-function difficultyText(d?: number): string {
-  if (d == null) return '-'
-  if (d <= 1) return '易'
-  if (d === 2) return '中'
-  return '难'
+function go(url: string) {
+  uni.navigateTo({ url, fail: () => uni.switchTab({ url }) })
 }
-function minutes(dish: any): number {
-  return (Number(dish.prepTime) || 0) + (Number(dish.cookTime) || 0)
-}
-
-async function loadPantry() {
-  pantryLoading.value = true
-  try {
-    pantry.value = await listPantry()
-    await loadMatches()
-  } catch {
-    pantry.value = []
-    matches.value = []
-  } finally {
-    pantryLoading.value = false
-  }
-}
-
-async function loadMatches() {
-  const ids = pantry.value.map((p) => p.ingredientId).filter((x): x is number => x != null)
-  if (!ids.length) {
-    matches.value = []
-    return
-  }
-  dishLoading.value = true
-  try {
-    const all = await findDishesByIngredients(ids)
-    matches.value = (all || []).slice(0, 10)
-  } catch {
-    matches.value = []
-  } finally {
-    dishLoading.value = false
-  }
+function goBack() {
+  uni.navigateBack({ fail: () => uni.switchTab({ url: '/pages/misc/Home' }) })
 }
 
 async function onRecommend() {
@@ -139,7 +131,7 @@ async function onRecommend() {
     const groups = await aiRecommendMenu({ scope: 'DAY' })
     if (groups && groups.length) {
       const first = groups[0]
-      const names = (first.dishes || []).map((d) => d.name).join('、')
+      const names = (first.dishes || []).map((d: any) => d.name).join('、')
       uni.showModal({
         title: '今晚吃这些？',
         content: names || '暂无推荐',
@@ -161,93 +153,175 @@ async function onRecommend() {
   }
 }
 
-function goSettings() {
-  uni.navigateTo({ url: '/pages/profile/Settings' })
-}
-function goPantry() {
-  uni.navigateTo({ url: '/pages/pantry/List' })
-}
-function goEstimate() {
-  uni.navigateTo({ url: '/pages/ai/Estimate' })
-}
-function goDetail(id: number) {
-  uni.navigateTo({ url: `/pages/dish/Detail?id=${id}` })
-}
-function goFind() {
-  uni.navigateTo({ url: '/pages/cookbook/FindByIngredients' })
-}
-
-onShow(() => {
-  loadPantry()
-})
+onShow(() => { m.load() })
 </script>
 
 <style scoped>
-.page { padding: 0 14px 24px; }
+.page {
+  padding: 0 28rpx calc(env(safe-area-inset-bottom) + 40rpx);
+  min-height: 100vh;
+}
 
 /* 顶栏 */
 .topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 2px 6px;
+  padding: calc(env(safe-area-inset-top) + 24rpx) 12rpx 8rpx;
 }
-.brand { font-size: 18px; font-weight: 700; color: #222; }
-.gear { font-size: 22px; color: #666; padding: 4px 8px; }
-
-/* 小标题 */
-.section-title {
-  font-size: 14px; color: #999;
-  margin: 16px 0 8px;
-  display: flex; align-items: center; gap: 6px;
+.back {
+  width: 60rpx;
+  font-size: 48rpx;
+  color: #2D2A26;
+  text-align: center;
 }
-.arrow { font-size: 13px; color: #ccc; }
-
-/* 家里有啥 横滑 */
-.pantry-scroll { white-space: nowrap; }
-.ph {
-  display: inline-block; font-size: 13px; color: #999;
-  background: #fff; border-radius: 8px; padding: 14px 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-}
-.pantry-row { display: inline-flex; gap: 8px; padding-right: 6px; }
-.p-card {
-  display: inline-flex; flex-direction: column; gap: 4px;
-  background: #fff; border-radius: 8px; padding: 10px 14px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  min-width: 78px;
-}
-.p-name { font-size: 14px; color: #222; font-weight: 600; }
-.p-tag { font-size: 12px; }
-.p-ok .p-tag { color: #2a9d8f; }
-.p-warn .p-tag { color: #FF6B35; }
-.p-danger .p-tag { color: #e63946; }
-
-/* 操作行 */
-.actions { display: flex; gap: 10px; margin: 6px 0 4px; }
-.half { flex: 1; }
-
-/* 菜谱卡片 */
-.dish-card { display: flex; flex-direction: column; gap: 6px; }
-.d-name { font-size: 16px; font-weight: 600; color: #222; display: flex; align-items: center; gap: 8px; }
-.badge-ok {
-  font-size: 11px; color: #fff; background: #2a9d8f;
-  padding: 1px 7px; border-radius: 10px;
-}
-.badge-mid {
-  font-size: 11px; color: #FF6B35; background: #fff1ea;
-  padding: 1px 7px; border-radius: 10px;
-}
-.d-meta { display: flex; gap: 14px; }
-.meta-item { font-size: 12px; color: #888; }
-.d-missing { font-size: 12px; color: #999; }
-
-.empty { color: #aaa; font-size: 13px; padding: 24px 0; text-align: center; }
-.more {
-  text-align: center; color: #FF6B35; font-size: 13px;
-  padding: 14px 0;
+.top-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #2D2A26;
 }
 
-/* 原生按钮复位 */
-button::after { border: none; }
+/* 问候 */
+.greeting {
+  padding: 32rpx 12rpx 12rpx;
+}
+.hi {
+  display: block;
+  font-size: 44rpx;
+  font-weight: bold;
+  color: #2D2A26;
+}
+.quote {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  font-style: italic;
+  color: #C4A882;
+}
+
+/* 金句轮播 */
+.quote-scroll {
+  white-space: nowrap;
+  margin: 24rpx 0;
+}
+.quote-row {
+  display: inline-flex;
+  gap: 20rpx;
+  padding: 8rpx 0;
+}
+.quote-card {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  width: 360rpx;
+  padding: 36rpx 28rpx;
+  background: #FFFFFF;
+  border-radius: 28rpx;
+  box-shadow: 0 4rpx 14rpx rgba(0, 0, 0, 0.06);
+  white-space: normal;
+  text-align: center;
+}
+.quote-card.hot {
+  background: linear-gradient(135deg, #FF8C42, #FFA45C);
+}
+.q-mark {
+  font-size: 56rpx;
+  color: #FF8C42;
+  line-height: 0.8;
+}
+.q-mark-end {
+  font-size: 56rpx;
+  color: #FF8C42;
+  line-height: 0.4;
+  align-self: flex-end;
+}
+.hot .q-mark, .hot .q-mark-end { color: rgba(255,255,255,0.6); }
+.q-text {
+  font-size: 28rpx;
+  line-height: 1.6;
+  color: #2D2A26;
+  margin: 8rpx 0;
+}
+.hot .q-text { color: #FFFFFF; font-weight: 600; }
+
+/* 今日推荐卡 */
+.recommend-card {
+  margin-top: 24rpx;
+  background: linear-gradient(135deg, #FF8C42, #E6762A);
+  border-radius: 36rpx;
+  padding: 40rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  box-shadow: 0 8rpx 24rpx rgba(255, 140, 66, 0.3);
+}
+.rec-head {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+.rec-flame { font-size: 28rpx; }
+.rec-label {
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.9);
+}
+.rec-title {
+  font-size: 40rpx;
+  font-weight: bold;
+  color: #FFFFFF;
+}
+.rec-sub {
+  font-size: 26rpx;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+/* 宫格标题 */
+.block-title {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin: 48rpx 12rpx 24rpx;
+}
+.tbar {
+  width: 8rpx;
+  height: 32rpx;
+  background: #FF8C42;
+  border-radius: 4rpx;
+}
+.block-title text {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #2D2A26;
+}
+
+/* 宫格 */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 20rpx;
+}
+.grid-cell {
+  background: #FFFFFF;
+  border-radius: 28rpx;
+  box-shadow: 0 4rpx 14rpx rgba(0, 0, 0, 0.05);
+  padding: 28rpx 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12rpx;
+}
+.cell-ico {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 28rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44rpx;
+}
+.cell-name {
+  font-size: 26rpx;
+  color: #2D2A26;
+  font-weight: 500;
+}
 </style>

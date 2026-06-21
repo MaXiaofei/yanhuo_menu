@@ -3,25 +3,19 @@
 		{
 			"path": "pages/login/Login",
 			"style": {
-				"navigationBarTitleText": "登录"
-			}
-		},
-		{
-			"path": "pages/index/Index",
-			"style": {
-				"navigationBarTitleText": "今晚吃啥"
+				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/dish/List",
 			"style": {
-				"navigationBarTitleText": "我的菜谱"
+				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/dish/Detail",
 			"style": {
-				"navigationBarTitleText": "菜谱"
+				"navigationStyle": "custom"
 			}
 		},
 		{
@@ -37,27 +31,39 @@
 			}
 		},
 		{
-			"path": "pages/mealplan/Calendar",
+			"path": "pages/menu/Home",
 			"style": {
-				"navigationBarTitleText": "本周排菜"
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/misc/Home",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/index/Index",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/profile/Settings",
+			"style": {
+				"navigationBarTitleText": "设置"
 			}
 		},
 		{
 			"path": "pages/shopping/List",
 			"style": {
-				"navigationBarTitleText": "采购单"
-			}
-		},
-		{
-			"path": "pages/shopping/Home",
-			"style": {
-				"navigationBarTitleText": "买点啥"
+				"navigationBarTitleText": "买菜"
 			}
 		},
 		{
 			"path": "pages/pantry/List",
 			"style": {
-				"navigationBarTitleText": "还剩啥"
+				"navigationBarTitleText": "家里有啥"
 			}
 		},
 		{
@@ -67,15 +73,15 @@
 			}
 		},
 		{
-			"path": "pages/ingredient/Create",
+			"path": "pages/mealplan/Calendar",
 			"style": {
-				"navigationBarTitleText": "食材补全"
+				"navigationBarTitleText": "本周排菜"
 			}
 		},
 		{
 			"path": "pages/ai/Recommend",
 			"style": {
-				"navigationBarTitleText": "换个推荐"
+				"navigationBarTitleText": "AI智选"
 			}
 		},
 		{
@@ -87,38 +93,38 @@
 		{
 			"path": "pages/cookbook/FindByIngredients",
 			"style": {
-				"navigationBarTitleText": "冰箱找菜"
+				"navigationBarTitleText": "食材找菜"
 			}
 		},
 		{
-			"path": "pages/profile/Settings",
+			"path": "pages/ingredient/Create",
 			"style": {
-				"navigationBarTitleText": "设置"
+				"navigationBarTitleText": "食材补全"
 			}
 		}
 	],
 	"globalStyle": {
-		"navigationBarBackgroundColor": "#FFFFFF",
+		"navigationBarBackgroundColor": "#FFFBF5",
 		"navigationBarTextStyle": "black",
-		"backgroundColor": "#FAFAFA"
+		"backgroundColor": "#FFFBF5"
 	},
 	"tabBar": {
-		"color": "#999999",
-		"selectedColor": "#FF6B35",
+		"color": "#9B958C",
+		"selectedColor": "#FF8C42",
 		"backgroundColor": "#FFFFFF",
 		"borderStyle": "white",
 		"list": [
 			{
-				"pagePath": "pages/index/Index",
-				"text": "今晚吃啥"
-			},
-			{
 				"pagePath": "pages/dish/List",
-				"text": "我的菜谱"
+				"text": "我的菜"
 			},
 			{
-				"pagePath": "pages/shopping/Home",
-				"text": "买点啥"
+				"pagePath": "pages/menu/Home",
+				"text": "菜单"
+			},
+			{
+				"pagePath": "pages/misc/Home",
+				"text": "更多"
 			}
 		]
 	}

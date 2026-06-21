@@ -15,64 +15,101 @@ onHide(() => {
 </script>
 <style lang="scss">
 @import "uview-plus/index.scss";
-
-/* ============ 全局（口语化 + 极简工具感） ============ */
-/* 背景 #FAFAFA，卡片白底 + 极轻阴影，圆角 8px，主色 #FF6B35 */
+/* ============ 温暖烟火·卡片流（Flutter 风格移植） ============ */
+/* 全局奶油白底 #FFFBF5 + 卡片白底大圆角 18 + 柔和阴影 + 暖橙渐变按钮 */
 page {
-  background: #FAFAFA;
-  color: #222;
+  background: #FFFBF5;
+  color: #2D2A26;
   font-size: 14px;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* 卡片通用 */
+/* 通用卡片：白底 + 大圆角 + 柔和阴影 */
+.yh-card {
+  background: #FFFFFF;
+  border-radius: 18px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+/* 兼容旧类名 .card */
 .card {
   background: #FFFFFF;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-  padding: 14px;
+  border-radius: 18px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+  padding: 16px;
   margin-bottom: 12px;
 }
 
-/* 小标题（灰） */
-.section-title {
+/* 渐变按钮（暖橙） */
+.yh-btn-gradient {
+  background: linear-gradient(135deg, #FF8C42, #FFA45C);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 14px;
+  padding: 14px 0;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(255, 140, 66, 0.3);
+  line-height: 1.4;
+}
+.yh-btn-gradient::after { border: none; }
+.yh-btn-gradient[disabled] {
+  background: linear-gradient(135deg, #FFB88C, #FFC9A8);
+  color: rgba(255, 255, 255, 0.85);
+  box-shadow: none;
+}
+
+/* 次按钮：白底描边暖橙 */
+.yh-btn-ghost {
+  background: #FFFFFF;
+  color: #FF8C42;
+  border: 1px solid #FF8C42;
+  border-radius: 14px;
+  padding: 13px 0;
+  font-size: 16px;
+  line-height: 1.4;
+}
+.yh-btn-ghost::after { border: none; }
+
+/* 小标题（暖灰） */
+.yh-section-title {
   font-size: 14px;
-  color: #999;
+  color: #9B958C;
   margin: 16px 0 8px;
   display: flex;
   align-items: center;
 }
 
-/* 主色按钮（原生 button 复位） */
-.btn-primary {
-  background: #FF6B35;
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 12px;
-  font-size: 16px;
-  line-height: 1.4;
-}
-.btn-primary::after {
-  border: none;
+/* 暖橙 tag */
+.yh-tag {
+  display: inline-block;
+  background: rgba(255, 140, 66, 0.1);
+  color: #FF8C42;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 12px;
 }
 
-/* 次按钮（白底描边） */
-.btn-ghost {
-  background: #fff;
-  color: #FF6B35;
-  border: 1px solid #FF6B35;
-  border-radius: 8px;
-  padding: 11px;
-  font-size: 16px;
-  line-height: 1.4;
-}
-.btn-ghost::after {
-  border: none;
-}
+/* 文字色 */
+.yh-text-primary { color: #2D2A26; }
+.yh-text-secondary { color: #9B958C; }
+.yh-text-hint { color: #B8B2A7; }
 
-/* 原生 input 复位 */
+/* 原生 input 复位（统一奶油白填充 + 暖橙聚焦边） */
 input {
   font-size: 14px;
-  color: #222;
+  color: #2D2A26;
 }
+
+/* 原生 button 复位 */
+button {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  line-height: normal;
+}
+button::after { border: none; }
 </style>

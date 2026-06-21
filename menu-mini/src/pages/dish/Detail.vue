@@ -1,40 +1,102 @@
 <template>
-  <view class="detail" v-if="dish">
-    <u-image :src="imgUrl(dish.coverUrl)" width="100%" height="200" v-if="dish.coverUrl" />
-    <view class="info">
-      <text class="title">{{ dish.name }}</text>
-      <text class="meta">备料 {{ dish.prepTime || 0 }}分 · 烹饪 {{ dish.cookTime || 0 }}分 · 难度 {{ dish.difficulty || '-' }}/5</text>
-      <text class="note" v-if="dish.note">{{ dish.note }}</text>
+  <view class="page">
+    <!-- 顶栏（自定义） -->
+    <view class="topbar">
+      <text class="back" @click="goBack">‹</text>
+      <text class="top-title">菜谱</text>
+      <view class="back"></view>
     </view>
-    <view class="nutrition" v-if="nutritionDisplay.length">
-      <text class="section">营养（份数 {{ serving }}）</text>
-      <view class="nutrition-list">
-        <view class="nutrition-row" v-for="(n, i) in nutritionDisplay" :key="i">
-          <text class="nutrition-label">{{ n.label }}</text>
-          <text class="nutrition-value">{{ n.value }}</text>
-          <text class="nutrition-unit">{{ n.unit }}</text>
+
+    <scroll-view scroll-y class="scroll" v-if="dish">
+      <!-- 封面大图 -->
+      <view class="cover-wrap">
+        <image
+          v-if="dish.coverUrl"
+          class="cover"
+          :src="imgUrl(dish.coverUrl)"
+          mode="aspectFill"
+        />
+        <view v-else class="cover ph-cover">🍽</view>
+      </view>
+
+      <!-- 标题区 -->
+      <view class="title-card">
+        <view class="title-row">
+          <text class="title">{{ dish.name }}</text>
+          <text :class="['src-tag', dish.source === 'IMPORT' ? 'imp' : 'own']">
+            {{ dish.source === 'IMPORT' ? '🌐' : '🏠' }}
+          </text>
+        </view>
+        <view class="meta-row">
+          <text class="meta-item">备料 {{ dish.prepTime || 0 }}分</text>
+          <text class="meta-dot">·</text>
+          <text class="meta-item">烹饪 {{ dish.cookTime || 0 }}分</text>
+          <text class="meta-dot">·</text>
+          <text class="meta-item">难度 {{ dish.difficulty || '-' }}/5</text>
+        </view>
+        <view v-if="dish.note" class="note">{{ dish.note }}</view>
+      </view>
+
+      <!-- 营养 -->
+      <view v-if="nutritionDisplay.length" class="block">
+        <view class="block-title">
+          <view class="tbar"></view>
+          <text>营养（份数 {{ serving }}）</text>
+        </view>
+        <view class="yh-card nutrition-card">
+          <view
+            class="nutrition-row"
+            v-for="(n, i) in nutritionDisplay"
+            :key="i"
+          >
+            <text class="n-label">{{ n.label }}</text>
+            <view class="n-right">
+              <text class="n-value">{{ n.value }}</text>
+              <text class="n-unit">{{ n.unit }}</text>
+            </view>
+          </view>
         </view>
       </view>
-    </view>
-    <view class="steps">
-      <text class="section">做法</text>
-      <view class="step" v-for="(s, i) in steps" :key="i">
-        <view class="step-head">
-          <text>步骤 {{ i + 1 }}</text>
-          <u-button size="mini" :type="active === i ? 'error' : 'primary'" @click="toggleTimer(i)">
-            {{ active === i ? '停止' : '计时' }}
-          </u-button>
+
+      <!-- 做法 -->
+      <view class="block">
+        <view class="block-title">
+          <view class="tbar"></view>
+          <text>做法</text>
         </view>
-        <text class="step-text">{{ s.text }}</text>
-        <view class="step-imgs" v-if="imgs(s.images).length">
-          <u-image v-for="(img, j) in imgs(s.images)" :key="j" :src="imgUrl(img)" width="80" height="80" />
+        <view class="yh-card step-card" v-for="(s, i) in steps" :key="i">
+          <view class="step-head">
+            <text class="step-no">步骤 {{ i + 1 }}</text>
+            <button
+              :class="['timer-btn', active === i ? 'stop' : '']"
+              @click="toggleTimer(i)"
+            >
+              {{ active === i ? '停止' : '计时' }}
+            </button>
+          </view>
+          <text class="step-text">{{ s.text }}</text>
+          <view class="step-imgs" v-if="imgs(s.images).length">
+            <image
+              v-for="(img, j) in imgs(s.images)"
+              :key="j"
+              class="step-img"
+              :src="imgUrl(img)"
+              mode="aspectFill"
+            />
+          </view>
+          <view v-if="active === i" class="timer">⏱ {{ elapsed }}s</view>
         </view>
-        <view class="timer" v-if="active === i">⏱ {{ elapsed }}s</view>
       </view>
-    </view>
-    <view class="actions">
-      <u-button type="warning" @click="onMarkDone">标记做过</u-button>
-      <u-button @click="goReview">去点评</u-button>
+
+      <view style="height: 160rpx;"></view>
+    </scroll-view>
+
+    <view v-else class="loading">加载中…</view>
+
+    <!-- 底部操作 -->
+    <view class="bottom-actions" v-if="dish">
+      <button class="yh-btn-ghost half" @click="onMarkDone">标记做过</button>
+      <button class="yh-btn-gradient half" @click="goReview">去点评</button>
     </view>
   </view>
 </template>
@@ -46,7 +108,6 @@ import { dishDetail, dishNutrition, markDone, nutritionMetrics } from '@/api/dis
 import { useMemberStore } from '@/store/member'
 
 const m = useMemberStore()
-// detail 返回 { dish, steps, cuisineIds, tagIds, categoryIds, ingredients }
 const data = ref<any>(null)
 const dish = computed(() => data.value?.dish || null)
 const steps = computed(() => data.value?.steps || [])
@@ -59,7 +120,6 @@ const active = ref(-1)
 const elapsed = ref(0)
 let timer: any = null
 
-// 后端 nutrition_metric 字典的 name 是英文（calorie/protein/fat/carb/sugar/gi），家庭看不懂 → 中文映射，兜底英文防新增指标无映射
 const METRIC_CN: Record<string, string> = {
   calorie: '热量',
   protein: '蛋白质',
@@ -68,13 +128,13 @@ const METRIC_CN: Record<string, string> = {
   sugar: '糖',
   gi: '升糖指数'
 }
-
-// 把 nutrition(Map 指标id→值) + metrics(字典) 合成可读列表「中文指标 + 值 + 单位」
 const nutritionDisplay = computed(() => {
   const arr: { label: string; value: any; unit: string }[] = []
   for (const m of metrics.value) {
     const v = nutrition.value[m.id]
-    if (v !== undefined && v !== null) arr.push({ label: METRIC_CN[m.name] || m.name, value: v, unit: m.unit ? m.unit : '' })
+    if (v !== undefined && v !== null) {
+      arr.push({ label: METRIC_CN[m.name] || m.name, value: v, unit: m.unit ? m.unit : '' })
+    }
   }
   return arr
 })
@@ -87,16 +147,8 @@ onLoad(async (q: any) => {
     uni.showToast({ title: '加载详情失败', icon: 'none' })
     return
   }
-  try {
-    nutrition.value = await dishNutrition(q.id, serving.value)
-  } catch {
-    // 营养加载失败不阻断详情展示
-  }
-  try {
-    metrics.value = await nutritionMetrics()
-  } catch {
-    // 字典加载失败不阻断详情展示
-  }
+  try { nutrition.value = await dishNutrition(q.id, serving.value) } catch {}
+  try { metrics.value = await nutritionMetrics() } catch {}
 })
 
 function toggleTimer(i: number) {
@@ -127,38 +179,215 @@ async function onMarkDone() {
   }
   try {
     await markDone(dishId.value, m.currentId)
-    uni.showToast({ title: '已记录' })
-  } catch {
-    // request.ts 已弹 toast
-  }
+    uni.showToast({ title: '已记录', icon: 'success' })
+  } catch {}
 }
 function goReview() {
-  uni.navigateTo({ url: `/pages/dish/Review?dishId=${dishId.value}`, fail: () => uni.showToast({ title: '点评页未就绪', icon: 'none' }) })
+  uni.navigateTo({ url: `/pages/dish/Review?dishId=${dishId.value}` })
+}
+function goBack() {
+  uni.navigateBack({ fail: () => uni.switchTab({ url: '/pages/dish/List' }) })
 }
 </script>
 
 <style scoped>
-.detail { padding-bottom: 40rpx; }
-.info { padding: 20rpx; }
-.title { font-size: 36rpx; font-weight: bold; display: block; }
-.meta { font-size: 24rpx; color: #999; display: block; margin-top: 8rpx; }
-.note { font-size: 24rpx; color: #666; display: block; margin-top: 8rpx; }
-.section { font-size: 30rpx; font-weight: bold; padding: 20rpx; display: block; }
-.nutrition-list { padding: 0 20rpx 10rpx; }
+.page {
+  min-height: 100vh;
+  background: #FFFBF5;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 顶栏 */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(env(safe-area-inset-top) + 16rpx) 24rpx 12rpx;
+  background: #FFFBF5;
+}
+.back {
+  width: 60rpx;
+  font-size: 48rpx;
+  color: #2D2A26;
+  text-align: center;
+}
+.top-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #2D2A26;
+}
+
+.scroll { flex: 1; }
+
+/* 封面 */
+.cover-wrap {
+  width: 100%;
+  height: 420rpx;
+}
+.cover { width: 100%; height: 100%; }
+.ph-cover {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #FFD9B8, #FFB37A);
+  font-size: 100rpx;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* 标题卡（上浮盖在封面底部） */
+.title-card {
+  margin: -48rpx 28rpx 0;
+  background: #FFFFFF;
+  border-radius: 36rpx;
+  box-shadow: 0 6rpx 20rpx rgba(0, 0, 0, 0.08);
+  padding: 36rpx;
+  position: relative;
+  z-index: 2;
+}
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+.title {
+  flex: 1;
+  font-size: 40rpx;
+  font-weight: bold;
+  color: #2D2A26;
+}
+.src-tag {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: rgba(255, 140, 66, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+}
+.meta-row {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  margin-top: 16rpx;
+}
+.meta-item { font-size: 24rpx; color: #9B958C; }
+.meta-dot { color: #B8B2A7; }
+.note {
+  margin-top: 16rpx;
+  font-size: 26rpx;
+  color: #9B958C;
+  line-height: 1.6;
+}
+
+/* 块 */
+.block { margin: 36rpx 28rpx 0; }
+.block-title {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 18rpx;
+}
+.tbar {
+  width: 8rpx;
+  height: 32rpx;
+  background: #FF8C42;
+  border-radius: 4rpx;
+}
+.block-title text {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #2D2A26;
+}
+
+/* 营养卡 */
+.nutrition-card { padding: 8rpx 32rpx; }
 .nutrition-row {
   display: flex;
   align-items: center;
-  padding: 12rpx 0;
-  border-bottom: 1rpx solid #f0f0f0;
+  justify-content: space-between;
+  padding: 24rpx 0;
+  border-bottom: 2rpx solid #F2EDE4;
 }
 .nutrition-row:last-child { border-bottom: none; }
-.nutrition-label { flex: 1; font-size: 28rpx; color: #333; }
-.nutrition-value { font-size: 30rpx; font-weight: bold; color: #FF8C42; margin-right: 8rpx; }
-.nutrition-unit { font-size: 24rpx; color: #999; width: 80rpx; text-align: left; }
-.step { padding: 16rpx 20rpx; border-top: 1rpx solid #eee; }
-.step-head { display: flex; justify-content: space-between; align-items: center; }
-.step-text { display: block; margin: 12rpx 0; font-size: 28rpx; }
-.step-imgs { display: flex; flex-wrap: wrap; gap: 12rpx; }
-.timer { color: #FF8C42; font-size: 32rpx; font-weight: bold; margin-top: 12rpx; }
-.actions { padding: 30rpx 20rpx; display: flex; flex-direction: column; gap: 20rpx; }
+.n-label { font-size: 28rpx; color: #2D2A26; }
+.n-right { display: flex; align-items: baseline; gap: 6rpx; }
+.n-value { font-size: 32rpx; font-weight: bold; color: #FF8C42; }
+.n-unit { font-size: 22rpx; color: #9B958C; }
+
+/* 步骤卡 */
+.step-card { padding: 28rpx 32rpx; }
+.step-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.step-no { font-size: 28rpx; font-weight: 600; color: #2D2A26; }
+.timer-btn {
+  background: #FF8C42;
+  color: #FFFFFF;
+  font-size: 24rpx;
+  padding: 8rpx 24rpx;
+  border-radius: 24rpx;
+  line-height: 1.4;
+}
+.timer-btn::after { border: none; }
+.timer-btn.stop {
+  background: #F56C6C;
+}
+.step-text {
+  display: block;
+  margin-top: 16rpx;
+  font-size: 28rpx;
+  color: #2D2A26;
+  line-height: 1.6;
+}
+.step-imgs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 16rpx;
+}
+.step-img {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 16rpx;
+}
+.timer {
+  color: #FF8C42;
+  font-size: 36rpx;
+  font-weight: bold;
+  margin-top: 16rpx;
+}
+
+.loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #B8B2A7;
+  font-size: 14px;
+}
+
+/* 底部操作 */
+.bottom-actions {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 24rpx 28rpx calc(env(safe-area-inset-bottom) + 24rpx);
+  background: #FFFFFF;
+  box-shadow: 0 -4rpx 16rpx rgba(0, 0, 0, 0.06);
+  display: flex;
+  gap: 20rpx;
+  z-index: 10;
+}
+.bottom-actions .half {
+  flex: 1;
+  height: 88rpx;
+  line-height: 88rpx;
+  font-size: 30rpx;
+  padding: 0;
+}
 </style>
