@@ -6,9 +6,9 @@ import com.yanhuo.xsd.common.PageQuery;
 import com.yanhuo.xsd.common.R;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -20,6 +20,7 @@ public class MemberController {
 
     private final MemberService svc;
     private final MpPermissionService permSvc;
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @GetMapping
     public R<IPage<Member>> list(PageQuery q) {
@@ -53,14 +54,27 @@ public class MemberController {
 
     @PostMapping
     public R<?> add(@RequestBody Member m) {
+        applyPassword(m);
         svc.save(m);
         return R.ok(m.getId());
     }
 
     @PutMapping
     public R<?> update(@RequestBody Member m) {
+        applyPassword(m);
         svc.updateById(m);
         return R.ok(null);
+    }
+
+    /**
+     * 把表单传入的明文 password( transient )加密为 passwordHash。
+     * 留空则不动现有哈希(编辑时不改密码场景)。
+     */
+    private void applyPassword(Member m) {
+        if (m.getPassword() != null && !m.getPassword().isBlank()) {
+            m.setPasswordHash(passwordEncoder.encode(m.getPassword()));
+        }
+        m.setPassword(null);
     }
 
     @DeleteMapping("/{id}")

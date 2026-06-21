@@ -72,6 +72,30 @@ class YanhuoE2EFlowTest {
 
     // ---------------- 5 场景 ----------------
 
+    /** 场景0（V29 合并）：手机号 member 登录成功 + session.currentMemberId = loginId（合并核心）。 */
+    @Test
+    void 合并_手机号member登录成功_登录即定就餐成员() {
+        // 用 member 1(张爸爸) 的手机号 13800000001 / 密码 chef123 登录（e2e-seed 兜底种子）
+        Map<String, String> body = new HashMap<>();
+        body.put("username", "13800000001");
+        body.put("password", "chef123");
+        JsonNode r = post("/auth/login", body);
+        assertThat(r.get("code").asInt())
+                .as("手机号登录应成功 msg=" + text(r, "msg")).isEqualTo(0);
+        String token = r.get("data").get("token").asText();
+        assertThat(token).as("应返回 token").isNotBlank();
+        // nickname = member.name（张爸爸）
+        assertThat(r.get("data").get("nickname").asText()).isEqualTo("张爸爸");
+
+        // 合并核心：登录即定就餐成员，session.currentMemberId == loginId(member.id=1)
+        JsonNode cur = get(token, "/member/current");
+        assertThat(cur.get("code").asInt()).isEqualTo(0);
+        // MEMBER_CHEF=1，登录即定就餐成员后应等于 1，无需再调 /member/current
+        assertThat(cur.get("data").asLong())
+                .as("登录即定就餐成员：currentMemberId 应=member.id(1)")
+                .isEqualTo(MEMBER_CHEF);
+    }
+
     /** 场景1：登录 + 设就餐成员 + 建周计划 + 挂菜 + 重复挂菜去重。 */
     @Test
     void 排菜_登录设成员建计划挂菜_重复挂菜返回去重() {

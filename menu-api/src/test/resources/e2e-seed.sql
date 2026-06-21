@@ -66,3 +66,12 @@ INSERT INTO dish_ingredient(dish_id, ingredient_id, amount) VALUES (1, 1, 300.00
 DELETE inn FROM ingredient_nutrition inn LEFT JOIN ingredient i ON i.id = inn.ingredient_id WHERE i.id IS NULL;
 
 -- 重置自增，便于断言固定 id（可选；测试用返回 id 不依赖固定值，故保留默认即可）。
+
+-- ============================================================
+-- V29 合并兜底：给 member 1(张爸爸/掌勺) 补登录账号 phone='13800000001' / 密码 'chef123'
+-- 用于「手机号登录」E2E 场景。每测试前幂等重置（测试库专用，覆盖安全）。
+-- BCrypt('chef123') 固定哈希，避免每条测试重新 encode。
+-- ============================================================
+UPDATE member SET phone = '13800000001',
+  password_hash = '$2a$10$8fMxXFI3W4XzBun3fNpUIuXT4dN9CRvHcw6K7edMJU78705ETwVrK'
+WHERE id = 1;

@@ -88,6 +88,12 @@ function audienceText(arr: unknown): string {
 function blankForm() {
   return {
     name: '',
+    // 登录手机号（admin 用字面量 "admin"）；空表示不开通登录
+    phone: '' as string,
+    // 初始/重置密码明文；编辑时留空表示不修改
+    password: '' as string,
+    // 是否超管（绕过权限矩阵全权）
+    isAdmin: false as boolean,
     // 表单内部用 number[]（role 字典 id）承载多选
     roleTags: [] as number[],
     // 小程序功能权限个人勾选（key 数组，null 走角色默认模板）
@@ -121,6 +127,9 @@ function openEdit(row: Member) {
   editing.value = row
   resetForm()
   form.name = row.name
+  form.phone = row.phone ?? ''
+  form.password = '' // 编辑时密码留空表示不改
+  form.isAdmin = Number(row.isAdmin) === 1
   form.roleTags = parseRoleIds(row.roleTags)
   form.mpPermissions = Array.isArray(row.mpPermissions) ? [...row.mpPermissions] : []
   form.healthProfile = { ...(row.healthProfile || {}) } as HealthProfile
@@ -138,10 +147,16 @@ async function onSubmit() {
   const roleTagsStr = form.roleTags.map(String).join(',')
   // mpPermissions：空数组时传 null，让后端走角色默认模板
   const mpPermissions = form.mpPermissions.length ? [...form.mpPermissions] : null
+  // phone：空串转 null（不开通登录）；password：空串转 null（编辑时不改）
+  const phone = form.phone.trim() || null
+  const password = form.password.trim() || null
   if (editing.value) {
     await updateMember({
       id: editing.value.id,
       name: form.name.trim(),
+      phone,
+      password,
+      isAdmin: form.isAdmin ? 1 : 0,
       roleTags: roleTagsStr,
       healthProfile: form.healthProfile,
       mpPermissions,
@@ -150,6 +165,9 @@ async function onSubmit() {
   } else {
     await createMember({
       name: form.name.trim(),
+      phone,
+      password,
+      isAdmin: form.isAdmin ? 1 : 0,
       roleTags: roleTagsStr,
       healthProfile: form.healthProfile,
       mpPermissions,
@@ -175,6 +193,17 @@ async function onDelete(row: Member) {
     </div>
     <el-table v-loading="loading" :data="list" border>
       <el-table-column label="姓名" prop="name" width="160" />
+      <el-table-column label="手机号" prop="phone" width="140">
+        <template #default="{ row }">
+          <span class="mini">{{ row.phone || '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="管理员" width="90" align="center">
+        <template #default="{ row }">
+          <el-tag v-if="Number(row.isAdmin) === 1" type="danger" size="small">超管</el-tag>
+          <span v-else class="mini">-</span>
+        </template>
+      </el-table-column>
       <el-table-column label="角色标签" min-width="200">
         <template #default="{ row }">
           <span class="mini">{{ roleTagsText(row.roleTags) }}</span>
@@ -207,6 +236,22 @@ async function onDelete(row: Member) {
       <el-form label-width="100px">
         <el-form-item label="姓名">
           <el-input v-model="form.name" placeholder="请输入姓名" />
+        </el-form-item>
+        <el-divider content-position="left">登录账号</el-divider>
+        <el-form-item label="手机号">
+          <el-input v-model="form.phone" placeholder="登录手机号（留空不开通登录；admin 用 admin）" />
+        </el-form-item>
+        <el-form-item label="密码">
+          <el-input
+            v-model="form.password"
+            type="password"
+            show-password
+            :placeholder="editing ? '留空不修改密码' : '初始密码'"
+          />
+        </el-form-item>
+        <el-form-item label="是否管理员">
+          <el-switch v-model="form.isAdmin" />
+          <span class="mini" style="margin-left: 12px">开启后绕过功能权限矩阵，拥有全部权限</span>
         </el-form-item>
         <el-form-item label="角色标签">
           <el-select

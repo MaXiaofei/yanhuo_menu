@@ -15,6 +15,12 @@ export interface HealthProfile {
 export interface Member {
   id: number
   name: string
+  /** 登录手机号（admin 用字面量 "admin"）；null 表示未开通登录。 */
+  phone?: string | null
+  /** BCrypt 密码哈希（前端只读，不回显明文）。 */
+  passwordHash?: string | null
+  /** 是否超管：1 绕过权限矩阵全权。 */
+  isAdmin?: number | null
   /** 角色标签：逗号分隔的 role 字典 id 字符串（如 "32,34"）。 */
   roleTags: string
   healthProfile: HealthProfile
@@ -25,6 +31,12 @@ export interface Member {
 export interface MemberSaveDTO {
   id?: number
   name: string
+  /** 登录手机号。 */
+  phone?: string | null
+  /** 初始/重置密码明文；编辑时留空表示不修改。 */
+  password?: string | null
+  /** 是否超管。 */
+  isAdmin?: boolean | number | null
   /** 提交时为逗号分隔的 role 字典 id 字符串。 */
   roleTags: string
   healthProfile: HealthProfile

@@ -84,6 +84,9 @@ public class MpPermissionService {
     /**
      * 运行期:按 member id 查角色 + 个人勾选,解析最终权限集合。
      * 供前端按钮显隐 / 切面校验使用。
+     *
+     * <p>超管短路:member.is_admin=1 直接返回全量功能 key(绕过 @MpPerm),
+     * 对应 admin 账号(V29 合并后 admin 落在 member 表 is_admin=1)。
      */
     public Set<String> resolveByMemberId(Long memberId) {
         if (memberId == null || memberMapper == null) {
@@ -92,6 +95,9 @@ public class MpPermissionService {
         Member m = memberMapper.selectById(memberId);
         if (m == null) {
             return Collections.emptySet();
+        }
+        if (m.getIsAdmin() != null && m.getIsAdmin() == 1) {
+            return new HashSet<>(allPermKeys());
         }
         return resolvePermissions(m.getRoleTags(), m.getMpPermissions());
     }
