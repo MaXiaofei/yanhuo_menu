@@ -115,12 +115,12 @@
 		"borderStyle": "white",
 		"list": [
 			{
-				"pagePath": "pages/dish/List",
-				"text": "我的菜"
+				"pagePath": "pages/index/Index",
+				"text": "首页"
 			},
 			{
-				"pagePath": "pages/menu/Home",
-				"text": "菜单"
+				"pagePath": "pages/dish/List",
+				"text": "菜库"
 			},
 			{
 				"pagePath": "pages/misc/Home",

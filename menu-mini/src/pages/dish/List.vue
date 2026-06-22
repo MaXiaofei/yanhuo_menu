@@ -82,34 +82,42 @@
       </view>
     </view>
 
-    <!-- 2 列网格卡片 -->
+    <!-- 菜品列表（方案D：左圆头像 + 右三行，类似微信列表） -->
     <view v-if="loading && !dishes.length" class="empty">加载中…</view>
     <view v-else-if="!dishes.length" class="empty">
       <text class="empty-ico">🍳</text>
       <text>还没有自己的菜谱，点 + 录一个吧</text>
     </view>
-    <view v-else class="grid">
+    <view v-else class="dish-list">
       <view
         v-for="d in dishes"
         :key="d.id"
-        class="dish-card"
+        class="dish-row"
         @click="goDetail(d.id)"
       >
-        <!-- 封面区 -->
-        <view class="cover-wrap">
-          <image v-if="d.coverUrl" class="cover" :src="imgUrl(d.coverUrl)" mode="aspectFill" />
-          <view v-else class="cover ph-cover">🍽</view>
-          <!-- 来源 icon -->
-          <view :class="['src-tag', d.source === 'IMPORT' ? 'imp' : 'own']">
-            {{ d.source === 'IMPORT' ? '🌐' : '🏠' }}
-          </view>
+        <!-- 左圆形头像 -->
+        <view class="dish-avatar">
+          <image v-if="d.coverUrl" class="avatar-img" :src="imgUrl(d.coverUrl)" mode="aspectFill" />
+          <text v-else class="avatar-ph">🍽</text>
         </view>
-        <!-- 信息区 -->
-        <view class="d-body">
-          <text class="d-name">{{ d.name }}</text>
-          <view class="d-meta">
-            <text v-if="totalMinutes(d)" class="yh-tag">{{ totalMinutes(d) }}分钟</text>
-            <text v-if="d.difficulty" class="yh-tag">难度{{ d.difficulty }}</text>
+        <!-- 右侧三行信息 -->
+        <view class="dish-info">
+          <!-- 第1行：菜名 + 来源标记 -->
+          <view class="dish-r1">
+            <text class="dish-name">{{ d.name }}</text>
+            <text v-if="d.source === 'IMPORT'" class="dish-src">🌐</text>
+          </view>
+          <!-- 第2行：做过·时间·评分（灰字点分隔） -->
+          <view class="dish-r2">
+            <text v-if="totalMinutes(d)" class="dish-meta">{{ totalMinutes(d) }}分钟</text>
+            <text v-if="totalMinutes(d) && d.difficulty" class="dish-dot"> · </text>
+            <text v-if="d.difficulty" class="dish-meta">{{ difficultyText(d.difficulty) }}</text>
+          </view>
+          <!-- 第3行：菜系+分类+标签（横排占一行） -->
+          <view class="dish-r3">
+            <text v-for="(c, i) in (d.cuisineNames || [])" :key="'c'+i" class="dish-tag">{{ c }}</text>
+            <text v-for="(c, i) in (d.categoryNames || [])" :key="'cat'+i" class="dish-tag">{{ c }}</text>
+            <text v-for="(t, i) in (d.tagNames || [])" :key="'t'+i" class="dish-tag">{{ t }}</text>
           </view>
         </view>
       </view>
@@ -232,6 +240,12 @@ async function load() {
 }
 function totalMinutes(d: any): number {
   return (Number(d.prepTime) || 0) + (Number(d.cookTime) || 0)
+}
+function difficultyText(d?: number): string {
+  if (d == null) return ''
+  if (d <= 1) return '简单'
+  if (d === 2) return '中等'
+  return '有难度'
 }
 function imgUrl(u: string): string {
   if (!u) return ''
@@ -371,55 +385,50 @@ reload()
 .half { flex: 1; }
 .sm { height: 64rpx; line-height: 64rpx; font-size: 13px; padding: 0; }
 
-/* 2 列网格 */
-.grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
+/* 菜品列表（方案D：左圆头像 + 右三行） */
+.dish-list {
+  display: flex;
+  flex-direction: column;
   padding: 8rpx 0;
 }
-.dish-card {
+.dish-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 24rpx;
   background: #FFFFFF;
-  border-radius: 36rpx;
-  box-shadow: 0 6rpx 20rpx rgba(0, 0, 0, 0.06);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  border-radius: 28rpx;
+  padding: 24rpx;
+  margin-bottom: 16rpx;
+  box-shadow: 0 4rpx 14rpx rgba(0, 0, 0, 0.05);
 }
-.cover-wrap {
-  position: relative;
-  width: 100%;
-  height: 220rpx;
-}
-.cover { width: 100%; height: 100%; }
-.ph-cover {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #FFD9B8, #FFB37A);
-  font-size: 56rpx;
-  color: rgba(255, 255, 255, 0.8);
-}
-.src-tag {
-  position: absolute;
-  top: 12rpx;
-  right: 12rpx;
-  width: 48rpx;
-  height: 48rpx;
+.dish-avatar {
+  width: 120rpx;
+  height: 120rpx;
   border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #FFD9B8, #FFB37A);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24rpx;
-  background: rgba(255, 255, 255, 0.85);
 }
-.d-body {
-  padding: 18rpx 22rpx 22rpx;
+.avatar-img { width: 100%; height: 100%; }
+.avatar-ph { font-size: 48rpx; color: rgba(255, 255, 255, 0.8); }
+.dish-info {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 10rpx;
+  gap: 8rpx;
+  min-width: 0;
+  padding-top: 4rpx;
 }
-.d-name {
+/* 第1行：菜名 + 来源 */
+.dish-r1 {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+.dish-name {
   font-size: 17px;
   font-weight: bold;
   color: #2D2A26;
@@ -427,10 +436,39 @@ reload()
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.d-meta {
+.dish-src {
+  font-size: 24rpx;
+  flex-shrink: 0;
+}
+/* 第2行：做过·时间·评分（灰字） */
+.dish-r2 {
+  display: flex;
+  align-items: center;
+}
+.dish-meta {
+  font-size: 24rpx;
+  color: #9B958C;
+}
+.dish-dot {
+  font-size: 24rpx;
+  color: #B8B2A7;
+}
+/* 第3行：分类标签（暖橙背景） */
+.dish-r3 {
   display: flex;
   flex-wrap: wrap;
-  gap: 6rpx;
+  gap: 8rpx;
+  margin-top: 4rpx;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.dish-tag {
+  display: inline-block;
+  background: rgba(255, 140, 66, 0.1);
+  color: #FF8C42;
+  border-radius: 8rpx;
+  padding: 4rpx 16rpx;
+  font-size: 22rpx;
 }
 
 /* 空态/底部 */

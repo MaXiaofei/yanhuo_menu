@@ -1,6 +1,7 @@
 package com.yanhuo.xsd.modules.dish;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -8,6 +9,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @TableName("dish")
@@ -37,4 +39,16 @@ public class Dish {
 
     @TableLogic
     private Integer deleted;
+
+    /** 菜系名（关联查询，不入库）。 */
+    @TableField(exist = false)
+    private List<String> cuisineNames;
+
+    /** 分类名（关联查询，不入库）。 */
+    @TableField(exist = false)
+    private List<String> categoryNames;
+
+    /** 标签名（关联查询，不入库）。 */
+    @TableField(exist = false)
+    private List<String> tagNames;
 }

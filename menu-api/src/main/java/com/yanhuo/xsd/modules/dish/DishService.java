@@ -11,15 +11,14 @@ import com.yanhuo.xsd.modules.dish.mapper.DishStepMapper;
 import com.yanhuo.xsd.modules.nutrition.IngredientNutrition;
 import com.yanhuo.xsd.modules.nutrition.NutritionCalcService;
 import com.yanhuo.xsd.modules.nutrition.mapper.IngredientNutritionMapper;
+import com.yanhuo.xsd.modules.dict.SysDict;
+import com.yanhuo.xsd.modules.dict.mapper.DictMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -34,6 +33,7 @@ public class DishService extends ServiceImpl<DishMapper, Dish> {
     private final DishIngredientMapper dishIngMapper;
     private final IngredientNutritionMapper ingredientNutritionMapper;
     private final NutritionCalcService nutritionCalc;
+    private final DictMapper dictMapper;
 
     /** 保存菜品（新增或更新），整体替换步骤 + 菜系/标签/分类关联 + 食材用量。 */
     @Transactional
@@ -126,7 +126,9 @@ public class DishService extends ServiceImpl<DishMapper, Dish> {
         Map<Long, BigDecimal> limits = q.getNutritionLimits();
         if (limits == null || limits.isEmpty()) {
             Page<Dish> page = new Page<>(q.getPageNum(), q.getPageSize());
-            return page(page, w);
+            IPage<Dish> result = page(page, w);
+            fillRelNames(result.getRecords());
+            return result;
         }
 
         // 有营养约束：先取候选池（按 NUTRITION_CANDIDATE_CAP 截断），内存算营养二次过滤后手动分页。
@@ -143,7 +145,43 @@ public class DishService extends ServiceImpl<DishMapper, Dish> {
         Page<Dish> page = new Page<>(q.getPageNum(), q.getPageSize());
         page.setTotal(total);
         page.setRecords(pageRecords);
+        fillRelNames(pageRecords);
         return page;
+    }
+
+    /** 批量填充菜品的菜系/分类/标签名（一次查 dish_dict + sys_dict，避免 N+1）。 */
+    private void fillRelNames(List<Dish> dishes) {
+        if (dishes == null || dishes.isEmpty()) return;
+        List<Long> dishIds = dishes.stream().map(Dish::getId).filter(Objects::nonNull).toList();
+        if (dishIds.isEmpty()) return;
+        List<DishDict> rels = dictRelMapper.selectList(
+                new QueryWrapper<DishDict>().in("dish_id", dishIds));
+        if (rels.isEmpty()) return;
+        Set<Long> dictIds = rels.stream().map(DishDict::getDictId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, String> nameMap = dictIds.isEmpty() ? Map.of()
+                : dictMapper.selectBatchIds(dictIds).stream()
+                .collect(Collectors.toMap(SysDict::getId, SysDict::getName));
+        for (Dish d : dishes) {
+            List<String> cuisines = new ArrayList<>();
+            List<String> categories = new ArrayList<>();
+            List<String> tags = new ArrayList<>();
+            for (DishDict rel : rels) {
+                if (rel.getDishId() != null && rel.getDishId().equals(d.getId())) {
+                    String name = nameMap.get(rel.getDictId());
+                    if (name == null) continue;
+                    switch (rel.getRelType()) {
+                        case "cuisine" -> cuisines.add(name);
+                        case "category" -> categories.add(name);
+                        case "tag" -> tags.add(name);
+                        default -> {}
+                    }
+                }
+            }
+            d.setCuisineNames(cuisines);
+            d.setCategoryNames(categories);
+            d.setTagNames(tags);
+        }
     }
 
     /** 该菜（1 份）各指标营养值是否全部 ≤ limits 上限；任一超限返回 false。 */
