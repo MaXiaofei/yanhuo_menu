@@ -4,7 +4,7 @@
     <view class="topbar">
       <view class="title-wrap">
         <view class="title-bar"></view>
-        <text class="title">我的菜</text>
+        <text class="title">菜库</text>
       </view>
     </view>
 
@@ -22,6 +22,12 @@
       <text v-if="keyword" class="s-clear" @click="clearKeyword">✕</text>
     </view>
 
+    <!-- 筛选折叠 -->
+    <view class="filter-toggle" @click="showFilter = !showFilter">
+      <text>{{ showFilter ? '收起筛选' : '筛选' }}</text>
+      <text v-if="activeFilterCount" class="badge">{{ activeFilterCount }}</text>
+    </view>
+
     <!-- 分类标签横滑 -->
     <scroll-view scroll-x class="cat-scroll" :show-scrollbar="false">
       <view class="cat-row">
@@ -35,12 +41,6 @@
         </view>
       </view>
     </scroll-view>
-
-    <!-- 筛选折叠（营养/难度，保留） -->
-    <view class="filter-toggle" @click="showFilter = !showFilter">
-      <text>{{ showFilter ? '收起筛选' : '筛选' }}</text>
-      <text v-if="activeFilterCount" class="badge">{{ activeFilterCount }}</text>
-    </view>
 
     <view v-if="showFilter" class="yh-card filter-panel">
       <view class="f-title">营养上限（每份不超）</view>
@@ -168,9 +168,9 @@ const activeCat = ref('all')
 const cats = [
   { key: 'all', label: '全部' },
   { key: 'done', label: '做过' },
-  { key: 'own', label: '自创🏠' },
-  { key: 'import', label: '导入🌐' },
-  { key: 'star', label: '⭐' },
+  { key: 'own', label: '自创' },
+  { key: 'import', label: '导入' },
+  { key: 'star', label: '收藏' },
 ]
 
 const filters = reactive({ sugar: '', cal: '', minutes: '' })
@@ -426,12 +426,20 @@ reload()
 .f-cell { flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .f-label { font-size: 11px; color: #9B958C; }
 .f-input {
-  background: #FFFBF5; border-radius: 10rpx;
-  padding: 10rpx 14rpx; font-size: 13px;
+  background: #FFFBF5;
+  border-radius: 14rpx;
+  padding: 16rpx 20rpx;
+  font-size: 26rpx;
+  color: #2D2A26;
+  min-height: 60rpx;
 }
 .f-picker {
-  background: #FFFBF5; border-radius: 10rpx;
-  padding: 10rpx 14rpx; font-size: 13px; color: #2D2A26;
+  background: #FFFBF5;
+  border-radius: 14rpx;
+  padding: 16rpx 20rpx;
+  font-size: 26rpx;
+  color: #2D2A26;
+  min-height: 60rpx;
 }
 .f-actions { display: flex; gap: 8px; margin-top: 12px; }
 .half { flex: 1; }

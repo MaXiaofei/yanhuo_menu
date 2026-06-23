@@ -32,18 +32,19 @@
           <text class="meta-dot">·</text>
           <text class="meta-item">烹饪 {{ dish.cookTime || 0 }}分</text>
           <text class="meta-dot">·</text>
-          <text class="meta-item">难度 {{ dish.difficulty || '-' }}/5</text>
+          <text class="diff-tag">{{ difficultyText(dish.difficulty) }}</text>
         </view>
         <view v-if="dish.note" class="note">{{ dish.note }}</view>
       </view>
 
       <!-- 营养 -->
       <view v-if="nutritionDisplay.length" class="block">
-        <view class="block-title">
+        <view class="block-title" @click="nutritionExpanded = !nutritionExpanded">
           <view class="tbar"></view>
           <text>营养（份数 {{ serving }}）</text>
+          <text class="expand-toggle">{{ nutritionExpanded ? '收起 ▲' : '展开 ▼' }}</text>
         </view>
-        <view class="yh-card nutrition-card">
+        <view v-if="nutritionExpanded" class="yh-card nutrition-card">
           <view
             class="nutrition-row"
             v-for="(n, i) in nutritionDisplay"
@@ -118,6 +119,14 @@ const serving = ref(1)
 const dishId = ref(0)
 const active = ref(-1)
 const elapsed = ref(0)
+const nutritionExpanded = ref(false)
+
+function difficultyText(d?: number): string {
+  if (d == null) return '难度未知'
+  if (d <= 2) return '简单'
+  if (d === 3) return '中等'
+  return '有难度'
+}
 let timer: any = null
 
 const METRIC_CN: Record<string, string> = {
@@ -274,6 +283,19 @@ function goBack() {
 }
 .meta-item { font-size: 24rpx; color: #9B958C; }
 .meta-dot { color: #B8B2A7; }
+.diff-tag {
+  display: inline-block;
+  background: rgba(255, 140, 66, 0.1);
+  color: #FF8C42;
+  border-radius: 8rpx;
+  padding: 4rpx 16rpx;
+  font-size: 22rpx;
+}
+.expand-toggle {
+  margin-left: auto;
+  font-size: 24rpx;
+  color: #9B958C;
+}
 .note {
   margin-top: 16rpx;
   font-size: 26rpx;
