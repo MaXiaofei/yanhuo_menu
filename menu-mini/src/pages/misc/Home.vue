@@ -94,7 +94,9 @@
 function go(url: string) {
   uni.navigateTo({ url })
 }
-</script>
+function goSettings() {
+  uni.navigateTo({ url: '/pages/profile/Settings' })
+}</script>
 
 <style scoped>
 .page {
