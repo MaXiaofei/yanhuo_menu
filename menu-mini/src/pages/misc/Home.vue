@@ -22,7 +22,7 @@
         <text class="entry-arrow">›</text>
       </view>
 
-      <view class="yh-card entry" @click="go('/pages/shopping/List?custom=1')">
+      <view class="yh-card entry" @click="go('/pages/shopping/List')">
         <view class="entry-ico" style="background: rgba(232,163,61,0.15); color:#E8A33D;">✏️</view>
         <view class="entry-body">
           <text class="entry-name">自定义采购</text>

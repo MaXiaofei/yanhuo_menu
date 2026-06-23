@@ -234,6 +234,22 @@ public class ShoppingService extends ServiceImpl<ShoppingListMapper, ShoppingLis
         return list;
     }
 
+    /**
+     * 建空采购单（自定义采购入口）：仅落一条 shopping_list（time_range=custom），
+     * 不预置采购项。MP 的 save 会自动回填 id。
+     *
+     * @return 新生成的 shopping_list.id
+     */
+    @Transactional
+    public Long createEmpty() {
+        ShoppingList sl = new ShoppingList();
+        sl.setTimeRange("custom");
+        sl.setStartDate(LocalDate.now());
+        sl.setEndDate(LocalDate.now());
+        save(sl);
+        return sl.getId();
+    }
+
     // ===================== 查询 =====================
 
     /** 采购清单详情：含 items（带中文）+ 按品类分区视图。 */

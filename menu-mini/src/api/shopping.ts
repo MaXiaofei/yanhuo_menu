@@ -56,6 +56,10 @@ export interface GenerateReq {
 export const generate = (req: GenerateReq) =>
   request<number>({ url: '/shopping/generate', method: 'POST', data: req })
 
+// 建空采购单（自定义采购入口），返回新 shopping_list.id
+export const createShopping = () =>
+  request<number>({ url: '/shopping/create', method: 'POST' })
+
 // 采购清单详情（含 items 中文 + 品类分区 + 采购单位中文）
 export const getDetail = (listId: number) =>
   request<ShoppingListVO>({ url: `/shopping/${listId}`, method: 'GET' })

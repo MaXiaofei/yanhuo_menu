@@ -61,6 +61,12 @@
 			}
 		},
 		{
+			"path": "pages/shopping/Detail",
+			"style": {
+				"navigationBarTitleText": "采购详情"
+			}
+		},
+		{
 			"path": "pages/pantry/List",
 			"style": {
 				"navigationBarTitleText": "家里有啥"

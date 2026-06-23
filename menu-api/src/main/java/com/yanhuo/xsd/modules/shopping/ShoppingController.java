@@ -49,6 +49,16 @@ public class ShoppingController {
         return R.ok(svc.generate(type, req.getSourceId(), req.getSourceIds()));
     }
 
+    /**
+     * 建空采购单（自定义采购入口）：仅落一条 shopping_list（time_range=custom），
+     * 不预置采购项，后续由前端手动添加。返回新 id。
+     */
+    @PostMapping("/create")
+    @MpPerm("shopping.generate")
+    public R<Long> create() {
+        return R.ok(svc.createEmpty());
+    }
+
     /** 采购清单详情：含 items（带中文：食材名/采购单位名/品类名）+ 按品类分区。 */
     @GetMapping("/{listId}")
     public R<ShoppingListVO> get(@PathVariable Long listId) {
