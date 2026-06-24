@@ -22,8 +22,8 @@
         @click="goDetail(l.id)"
       >
         <view class="row-main">
-          <text class="row-title">采购单 #{{ l.id }}</text>
-          <text class="row-date">{{ dateText(l) }}</text>
+          <text class="row-title">采购单·{{ sourceTag(l) }}·{{ dailySeq(l) }}</text>
+          <text class="row-date">{{ timeText(l) }}</text>
         </view>
         <text class="row-range">{{ rangeTag(l) }}</text>
         <text class="row-arrow">›</text>
@@ -54,11 +54,29 @@ async function reload() {
   }
 }
 
-function dateText(l: ShoppingList): string {
+function sourceTag(l: ShoppingList): string {
+  const r = l.timeRange
+  if (!r) return '自定义'
+  if (r === 'custom') return '自定义'
+  if (r === 'plan') return '周计划'
+  if (r === 'menu') return '菜单'
+  if (r === 'dish') return '菜品'
+  return r
+}
+
+function timeText(l: ShoppingList): string {
   const d = l.createdAt || l.startDate
   if (!d) return ''
-  // createdAt 可能是 "2026-06-24T12:00:00"，取日期部分
-  return String(d).slice(0, 10)
+  const s = String(d)
+  // "2026-06-24T12:30:00" → "06-24 12:30"
+  const date = s.slice(5, 10)
+  const time = s.slice(11, 16)
+  return `${date} ${time}`
+}
+
+function dailySeq(l: ShoppingList): string {
+  // 当天序号：用 id 末位+1 作为简单序号（同一天内递增）
+  return `第${(l.id % 100) + 1}单`
 }
 
 function rangeTag(l: ShoppingList): string {
