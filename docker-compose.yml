@@ -1,16 +1,16 @@
 # 咕嘟小食单 · 开发依赖（MySQL / Redis / MinIO）
 # 部署位置：服务器 192.168.100.248:/home/claude/yanhuo-deps/
 # 本机开发连这一组：
-#   mysql  192.168.100.248:13306  (root/MYSQL_PWD_REDACTED, 库 yanhuo)
+#   mysql  192.168.100.248:13306  (root,密码见 .env, 库 yanhuo)
 #   redis  192.168.100.248:16379
-#   minio  192.168.100.248:19000(API) / :19001(控制台)  (minio/MINIO_PWD_REDACTED)
+#   minio  192.168.100.248:19000(API) / :19001(控制台)  (minio,密码见 .env)
 services:
   yanhuo-mysql:
     image: mysql:8.0
     container_name: yanhuo-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: MYSQL_PWD_REDACTED
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-MYSQL_PWD_REDACTED}
       MYSQL_DATABASE: yanhuo
       TZ: Asia/Shanghai
     command:
@@ -40,6 +40,6 @@ services:
       - "19001:9001"
     environment:
       MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: MINIO_PWD_REDACTED
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-MINIO_PWD_REDACTED}
     volumes:
       - ./data/minio:/data

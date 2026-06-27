@@ -5,7 +5,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://192.168.100.248:13306/yanhuo_test?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8&allowPublicKeyRetrieval=true
     username: root
-    password: MYSQL_PWD_REDACTED
+    password: ${MYSQL_ROOT_PASSWORD:MYSQL_PWD_REDACTED}
   data:
     redis:
       host: 192.168.100.248

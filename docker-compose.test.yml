@@ -18,7 +18,7 @@ services:
     container_name: gudu-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: MYSQL_PWD_REDACTED
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: gudu
       TZ: Asia/Shanghai
     command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci", "--character-set-client-handshake=FALSE"]
@@ -44,6 +44,7 @@ services:
       SPRING_PROFILES_ACTIVE: prod
       TZ: Asia/Shanghai
       API_KEY: ${API_KEY:-}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     volumes:
       - uploads:/app/uploads
       - ./logs:/app/logs
