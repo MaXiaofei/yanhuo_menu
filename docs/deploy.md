@@ -6,8 +6,8 @@
 
 | 环境 | 位置 | 用途 | 访问地址 | 项目目录 | 部署方式 |
 |------|------|------|----------|----------|----------|
-| **测试环境** | 内网服务器 `192.168.100.248` | 日常部署验证、联调 | `http://192.168.100.248:8080` | `/home/claude/yanhuo-deploy/` | `docker compose -f docker-compose.test.yml up -d --build` |
-| **生产环境** | 腾讯云 `49.232.3.201` | 正式上线 | **http://49.232.3.201** | `/root/yanhuo/` | `docker compose -f docker-compose.prod.yml up -d --build` |
+| **测试环境** | 内网服务器 `192.168.100.248` | 日常部署验证、联调 | `http://192.168.100.248:8080` | `/home/john/gudu-deploy/` | `docker compose -f docker-compose.test.yml up -d --build` |
+| **生产环境** | 腾讯云 `49.232.3.201` | 正式上线 | **http://49.232.3.201** | `/root/gudu/` | `docker compose -f docker-compose.prod.yml up -d --build` |
 
 > **部署规则**：说「部署到测试」→ 部署到内网 `192.168.100.248`；说「上生产」→ 才部署到腾讯云 `49.232.3.201`。
 >
@@ -15,7 +15,7 @@
 
 > 两套环境都通过 `docker-compose.prod.yml` 编排，区别在连接信息和部署目录。
 
-> **⚠️ compose 文件区分**：测试环境用 **`docker-compose.test.yml`**（HTTP，menu-admin 直挂 8080，无 front-nginx/certbot）；生产用 **`docker-compose.prod.yml`**（HTTPS，front-nginx + certbot）。两者 mysql/redis/menu-api 的 service 名与卷名严格一致（`yanhuo-deploy_mysql-data`），切换时不重建卷、不丢数据。**测试环境宿主机的 80 端口被原生 nginx 占用，不能用 prod.yml。**
+> **⚠️ compose 文件区分**：测试环境用 **`docker-compose.test.yml`**（HTTP，menu-admin 直挂 8080，无 front-nginx/certbot）；生产用 **`docker-compose.prod.yml`**（HTTPS，front-nginx + certbot）。两者 mysql/redis/menu-api 的 service 名与卷名严格一致（`gudu-deploy_mysql-data`），切换时不重建卷、不丢数据。**测试环境宿主机的 80 端口被原生 nginx 占用，不能用 prod.yml。**
 
 > **密钥/口令**统一放 `.env.dev`（本地、已被 `.gitignore` 忽略），本文档不写明文密钥。
 
@@ -29,12 +29,13 @@
 |------|-----|
 | 内网 IP | `192.168.100.248` |
 | 主机名 | `home-fn` |
-| SSH 用户 | `john`（属 Administrators 组，可 sudo，**不在 docker 组**，docker 命令需 `sudo`） |
+| SSH 用户 | `john`（属 Administrators 组，可 sudo；**已在 docker 组**，docker 命令免 sudo） |
 | 系统架构 | x86_64 |
 | Docker | 28.5.2 / Compose v2.40.3 |
-| 项目目录 | `/home/claude/yanhuo-deploy/`（属主 `claude`，john 无写权限，部署需 `sudo`） |
-| 备份目录 | `/home/claude/yanhuo-deploy/backups/` |
-| 数据卷 | `yanhuo-deploy_mysql-data`（**保留，不清库**） |
+| 项目目录 | `/home/john/gudu-deploy/`（属主 `john`，直接读写，免 sudo） |
+| 备份目录 | `/home/john/gudu-deploy/backups/` |
+| 数据卷 | `gudu-deploy_mysql-data`（**保留，不清库**） |
+| ⚠️ 网络 | **无外网**，docker build 无法拉取新基础镜像（见下方说明） |
 
 ### 1.2 容器与端口
 
@@ -42,23 +43,30 @@
 |------|--------------|------|
 | `menu-api` | 8080(容器内) | 后端，不直接暴露，经 nginx 代理 |
 | `menu-admin` | `8080->80` | 前端 Nginx（注意：测试环境前端走 8080，非 80） |
-| `yanhuo-mysql-prod` | `3306` | MySQL 8.0，库 `yanhuo` |
-| `yanhuo-redis-prod` | `6379` | Redis 7 |
+| `gudu-mysql` | `3306` | MySQL 8.0，库 `gudu`，密码见 `.env` |
+| `gudu-redis` | `6379` | Redis 7 |
 
 > 测试环境**未配置 HTTPS**（无 certbot），走 HTTP。`menu-api` 的 `API_KEY` 当前为空，AI 功能降级为 mock（这是测试环境既定状态）。
 
-### 1.3 SSH 连接
+### 1.3 SSH 连接与部署
 
 john 可直接 SSH（密码见 `.env.dev` 的 `SSH_PASS`/`SSH_HOST`）：
 ```bash
 ssh john@192.168.100.248
 ```
-但 docker 命令需 sudo，且测试环境用 **`docker-compose.test.yml`**：
+john 已在 docker 组，部署目录在自己家下，**docker 命令免 sudo、可直接 cd**：
 ```bash
-sudo docker compose --project-directory /home/claude/yanhuo-deploy -f docker-compose.test.yml ps
-sudo docker compose --project-directory /home/claude/yanhuo-deploy -f docker-compose.test.yml up -d --build
+cd /home/john/gudu-deploy
+docker compose -f docker-compose.test.yml ps
+docker compose -f docker-compose.test.yml up -d --build
 ```
-> john 无 `cd` 进 `/home/claude/yanhuo-deploy` 的权限（目录属主 claude），故用 `--project-directory` 指定工作目录解析相对路径，配合 sudo 执行。
+
+### 1.4 ⚠️ 网络限制（无外网）
+
+测试服务器**无外网访问**，影响 docker 构建：
+- ✅ 现有基础镜像（`mysql:8.0`/`redis:7`/`maven:...`/`nginx:alpine`）已缓存，可正常 build
+- ❌ **缺** `eclipse-temurin:17-jre`（menu-api 运行时）、`node:20-alpine`（menu-admin 构建），需要 `--no-cache` 重建时会因拉不到镜像而失败
+- **应对**：基础镜像缺失时，需先从有外网的机器 `docker save` 导出 → 传到服务器 `docker load` 导入
 
 ### 1.4 数据库现状（部署前核查，2026-06-27）
 
