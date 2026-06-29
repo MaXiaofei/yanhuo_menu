@@ -1,4 +1,4 @@
-/* 默认兜底主题（烟火暖橙），主题切换由 themeStore.apply 覆盖 CSS 变量 */
+/* 默认兜底主题（咕嘟暖橙），主题切换由 themeStore.apply 覆盖 CSS 变量 */
 :root {
   --el-color-primary: #E8602C;
   --el-color-primary-light-3: color-mix(in srgb, var(--el-color-primary) 70%, white);

@@ -109,6 +109,11 @@ function onPageChange(p: number) {
   pageNum.value = p
 }
 
+// 搜索按钮：重置到第一页（输入时 watch 已实时过滤，这里仅统一交互）
+function onSearch() {
+  pageNum.value = 1
+}
+
 // 表头点击排序：el-table sort-change 回调（sortable="custom"）
 function onSortChange({ prop, order }: { prop: string | null; order: 'ascending' | 'descending' | null }) {
   if (!order) {
@@ -273,25 +278,27 @@ async function onDelete(row: Ingredient) {
 
 <template>
   <div class="page">
-    <div class="toolbar">
+	    <div class="toolbar">
+	      <el-input
+	        v-model="keyword"
+	        placeholder="食材名称搜索"
+	        clearable
+	        class="filter-input"
+	      />
+	      <el-button type="primary" @click="onSearch">搜索</el-button>
+	      <el-select
+	        v-model="purchaseFilter"
+	        placeholder="采购分类（全部）"
+	        clearable
+	        class="filter-cat"
+	        @clear="clearPurchaseFilter"
+	      >
+	        <el-option label="全部" :value="null" />
+	        <el-option v-for="p in purchaseOptions" :key="p.id" :label="p.name" :value="p.id" />
+	      </el-select>
+	      <span class="filter-tip">默认按使用次数排序</span>
+      <div class="spacer" />
       <el-button type="primary" @click="openCreate">新增食材</el-button>
-      <el-input
-        v-model="keyword"
-        placeholder="搜索食材名称"
-        clearable
-        class="filter-name"
-      />
-      <el-select
-        v-model="purchaseFilter"
-        placeholder="采购分类（全部）"
-        clearable
-        class="filter-cat"
-        @clear="clearPurchaseFilter"
-      >
-        <el-option label="全部" :value="null" />
-        <el-option v-for="p in purchaseOptions" :key="p.id" :label="p.name" :value="p.id" />
-      </el-select>
-      <span class="filter-tip">默认按使用次数排序</span>
     </div>
     <el-table v-loading="loading" :data="list" border @sort-change="onSortChange">
       <el-table-column label="名称" prop="name" min-width="160" />
@@ -375,17 +382,20 @@ async function onDelete(row: Ingredient) {
   border-radius: 8px;
 }
 .toolbar {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   display: flex;
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
 }
-.filter-name {
-  width: 220px;
+.filter-input {
+  width: 240px;
 }
 .filter-cat {
   width: 200px;
+}
+.spacer {
+  flex: 1;
 }
 .filter-tip {
   font-size: 12px;

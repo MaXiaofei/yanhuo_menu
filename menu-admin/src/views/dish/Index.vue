@@ -329,14 +329,15 @@ async function showHistory(row: DishSearchRow) {
     <div class="toolbar">
       <el-input
         v-model="query.keyword"
-        placeholder="菜品名搜索"
+        placeholder="菜品名称搜索"
         clearable
-        style="width: 240px"
+        class="filter-input"
         @keyup.enter="onSearch"
       />
       <el-button type="primary" @click="onSearch">搜索</el-button>
-      <el-button type="success" @click="openCreate">新增菜品</el-button>
-      <el-button type="warning" @click="openImport">URL 导入</el-button>
+      <div class="spacer" />
+      <el-button type="primary" @click="openCreate">新增菜品</el-button>
+      <el-button @click="openImport">URL 导入</el-button>
     </div>
 
     <el-table v-loading="loading" :data="list" border>
@@ -508,9 +509,16 @@ async function showHistory(row: DishSearchRow) {
   border-radius: 8px;
 }
 .toolbar {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 12px;
+}
+.filter-input {
+  width: 240px;
+}
+.spacer {
+  flex: 1;
 }
 .inline-row {
   margin-bottom: 8px;

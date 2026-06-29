@@ -463,7 +463,7 @@ onLoad(async (q: any) => {
 onShareAppMessage(() => {
   const d = detail.value
   const id = d?.id
-  const title = d ? `采购单 · ${rangeText(d)}` : '烟火小食单 · 采购单'
+  const title = d ? `采购单 · ${rangeText(d)}` : '咕嘟小食单 · 采购单'
   return {
     title,
     path: id ? `/pages/shopping/Detail?id=${id}` : '/pages/shopping/List',
@@ -568,7 +568,7 @@ async function onExportImage() {
     })
     ctx.setFillStyle('#bbb')
     ctx.setFontSize(10)
-    ctx.fillText('烟火小食单', 16, height - 12)
+    ctx.fillText('咕嘟小食单', 16, height - 12)
 
     await drawSync(ctx)
     const tempPath = await canvasToTemp('shoppingExport')

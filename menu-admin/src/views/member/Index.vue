@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   listMembers,
@@ -14,26 +14,49 @@ import { listByGroup, type DictItem } from '@/api/dict'
 import Pagination from '@/components/Pagination.vue'
 
 const loading = ref(false)
-const list = ref<Member[]>([])
-const total = ref(0)
+const allList = ref<Member[]>([])
+const keyword = ref('')
 const pageNum = ref(1)
 const pageSize = 20
+
+// 名称关键词过滤（前端本地，数据量小）
+const filteredList = computed<Member[]>(() => {
+  const kw = keyword.value.trim().toLowerCase()
+  if (!kw) return allList.value
+  return allList.value.filter((m) => (m.name || '').toLowerCase().includes(kw))
+})
+
+const list = computed<Member[]>(() => {
+  const start = (pageNum.value - 1) * pageSize
+  return filteredList.value.slice(start, start + pageSize)
+})
+
+// 过滤后总数：keyword 变化时自动更新并回到第一页
+const total = computed(() => filteredList.value.length)
+watch(keyword, () => {
+  pageNum.value = 1
+})
+
+async function load() {
+  loading.value = true
+  try {
+    // 后端不支持 keyword，拉全量后前端过滤分页（数据量小）
+    const page = await listMembers({ pageNum: 1, pageSize: 999 })
+    allList.value = page.records || []
+    pageNum.value = 1
+  } finally {
+    loading.value = false
+  }
+}
+
+function onSearch() {
+  pageNum.value = 1
+}
 const audienceOptions = ref<DictItem[]>([])
 const genderOptions = ref<DictItem[]>([])
 const roleOptions = ref<DictItem[]>([])
 /** 全量功能权限 key -> 中文映射（来自后端 /member/permissions/keys）。 */
 const permOptions = ref<Record<string, string>>({})
-
-async function load() {
-  loading.value = true
-  try {
-    const page = await listMembers({ pageNum: pageNum.value, pageSize })
-    list.value = page.records || []
-    total.value = page.total || 0
-  } finally {
-    loading.value = false
-  }
-}
 
 function onPageChange(p: number) {
   pageNum.value = p
@@ -189,6 +212,15 @@ async function onDelete(row: Member) {
 <template>
   <div class="page">
     <div class="toolbar">
+      <el-input
+        v-model="keyword"
+        placeholder="成员名称搜索"
+        clearable
+        class="filter-input"
+        @keyup.enter="onSearch"
+      />
+      <el-button type="primary" @click="onSearch">搜索</el-button>
+      <div class="spacer" />
       <el-button type="primary" @click="openCreate">新增成员</el-button>
     </div>
     <el-table v-loading="loading" :data="list" border>
@@ -355,7 +387,16 @@ async function onDelete(row: Member) {
   border-radius: 8px;
 }
 .toolbar {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.filter-input {
+  width: 240px;
+}
+.spacer {
+  flex: 1;
 }
 .mini {
   font-size: 12px;

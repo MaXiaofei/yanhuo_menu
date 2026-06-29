@@ -6,6 +6,7 @@ import com.gudu.xsd.common.BizException;
 import com.gudu.xsd.modules.ai.dto.CandidateDish;
 import com.gudu.xsd.modules.ai.dto.MenuCandidate;
 import com.gudu.xsd.modules.ai.dto.MenuRecommendRequest;
+import com.gudu.xsd.modules.ai.dto.MenuRecommendResponse;
 import com.gudu.xsd.modules.ai.mapper.AiCallLogMapper;
 import com.gudu.xsd.modules.dish.Dish;
 import com.gudu.xsd.modules.dish.DishSearchDTO;
@@ -44,6 +45,7 @@ class AiServiceTest {
     private MemberMapper memberMapper;
     private AiCallLogMapper aiCallLogMapper;
     private DishIngredientMapper dishIngredientMapper;
+    private MenuRecommender menuRecommender;
 
     @BeforeEach
     @SuppressWarnings("unchecked")
@@ -56,11 +58,12 @@ class AiServiceTest {
         dishIngredientMapper = mock(DishIngredientMapper.class);
         memberMapper = mock(MemberMapper.class);
         aiCallLogMapper = mock(AiCallLogMapper.class);
+        menuRecommender = mock(MenuRecommender.class);
 
         svc = new AiService(aiClient, ingredientService, ingredientMapper,
                 dishService, dishQueryService, dishIngredientMapper,
                 memberMapper, aiCallLogMapper, new ObjectMapper(),
-                new AiInputGuard());
+                new AiInputGuard(), menuRecommender);
         // @Value 在 new 出来的实例上不生效，手动注入默认额度
         org.springframework.test.util.ReflectionTestUtils.setField(svc, "dailyLimit", 50);
     }
@@ -84,7 +87,7 @@ class AiServiceTest {
         when(dishIngredientMapper.selectList(any())).thenReturn(List.of());
         when(memberMapper.selectById(anyLong())).thenReturn(null); // 无健康档案
 
-        when(aiClient.recommendMenu(any())).thenReturn(List.of());
+        when(aiClient.recommendMenu(any())).thenReturn(new MenuRecommendResponse(List.of()));
 
         var req = new MenuRecommendRequest(1L, new BigDecimal("100"), "DAY",
                 null, null, null, null, null);
@@ -109,7 +112,7 @@ class AiServiceTest {
         when(dishQueryService.nutrition(eq(1L), any(BigDecimal.class)))
                 .thenReturn(Map.of(2L, new BigDecimal("12"), 5L, new BigDecimal("3")));
         when(dishIngredientMapper.selectList(any())).thenReturn(List.of());
-        when(aiClient.recommendMenu(any())).thenReturn(List.of());
+        when(aiClient.recommendMenu(any())).thenReturn(new MenuRecommendResponse(List.of()));
 
         var req = new MenuRecommendRequest(1L, new BigDecimal("100"), "DAY",
                 null, null, null, null, null);
@@ -142,7 +145,7 @@ class AiServiceTest {
         MenuCandidate expected = new MenuCandidate(
                 List.of(new MenuCandidate.DishItem(1L, "番茄炒蛋", BigDecimal.ONE, new BigDecimal("10"))),
                 new BigDecimal("10"), Map.of(), 0.0, List.of("清淡"), "deepseek");
-        when(aiClient.recommendMenu(any())).thenReturn(List.of(expected));
+        when(aiClient.recommendMenu(any())).thenReturn(new MenuRecommendResponse(List.of(expected)));
 
         var req = new MenuRecommendRequest(1L, new BigDecimal("100"), "DAY",
                 null, null, null, null, null);
@@ -177,7 +180,7 @@ class AiServiceTest {
         when(dishQueryService.nutrition(anyLong(), any(BigDecimal.class))).thenReturn(Map.of());
         when(dishIngredientMapper.selectList(any())).thenReturn(List.of());
         when(memberMapper.selectById(anyLong())).thenReturn(null);
-        when(aiClient.recommendMenu(any())).thenReturn(List.of());
+        when(aiClient.recommendMenu(any())).thenReturn(new MenuRecommendResponse(List.of()));
 
         var req = new MenuRecommendRequest(1L, new BigDecimal("100"), "DAY",
                 null, null, null, null, null);
@@ -191,7 +194,7 @@ class AiServiceTest {
         IPage<Dish> page = mock(IPage.class);
         when(page.getRecords()).thenReturn(List.of());
         when(dishService.search(any(DishSearchDTO.class))).thenReturn(page);
-        when(aiClient.recommendMenu(any())).thenReturn(List.of());
+        when(aiClient.recommendMenu(any())).thenReturn(new MenuRecommendResponse(List.of()));
 
         var req = new MenuRecommendRequest(null, new BigDecimal("100"), "DAY",
                 null, null, null, null, null);

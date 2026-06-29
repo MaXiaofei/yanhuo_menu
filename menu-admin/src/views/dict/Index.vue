@@ -66,8 +66,37 @@ interface GroupState {
 
 // 各 group 的分页状态
 const dictMap = reactive<Record<string, GroupState>>({})
+// 各 group 的搜索关键词（前端本地过滤，数据量小）
+const groupKeyword = reactive<Record<string, string>>({})
 // 营养指标数据
 const metrics = ref<NutritionMetric[]>([])
+
+// 按 group 取过滤后的列表（名称 includes，不区分大小写）
+function filteredRecords(group: string): DictItem[] {
+  const st = dictMap[group]
+  if (!st) return []
+  const kw = (groupKeyword[group] || '').trim().toLowerCase()
+  if (!kw) return st.records
+  return st.records.filter((r) => (r.name || '').toLowerCase().includes(kw))
+}
+
+// 过滤后用于表格展示的当前页数据
+function pagedRecords(group: string): DictItem[] {
+  const rows = filteredRecords(group)
+  const st = dictMap[group]
+  const start = ((st?.pageNum || 1) - 1) * pageSize
+  return rows.slice(start, start + pageSize)
+}
+
+// 过滤后总数
+function filteredTotal(group: string): number {
+  return filteredRecords(group).length
+}
+
+function onSearch(group: string) {
+  if (!dictMap[group]) dictMap[group] = { records: [], total: 0, pageNum: 1 }
+  dictMap[group].pageNum = 1
+}
 
 async function loadGroup(group: string) {
   loading.value = true
@@ -163,10 +192,19 @@ async function onDelete(row: DictItem) {
         :label="g.title"
         :name="g.key"
       >
-        <div class="tab-toolbar">
+        <div class="toolbar">
+          <el-input
+            v-model="groupKeyword[g.key]"
+            placeholder="名称搜索"
+            clearable
+            class="filter-input"
+            @keyup.enter="onSearch(g.key)"
+          />
+          <el-button type="primary" @click="onSearch(g.key)">搜索</el-button>
+          <div class="spacer" />
           <el-button type="primary" @click="openCreate">新增{{ g.title }}</el-button>
         </div>
-        <el-table v-loading="loading" :data="(dictMap[g.key] && dictMap[g.key].records) || []" border size="default">
+        <el-table v-loading="loading" :data="pagedRecords(g.key)" border size="default">
           <el-table-column label="名称" prop="name" min-width="180" />
           <el-table-column label="排序" prop="sort" width="100" />
           <el-table-column label="操作" width="160" fixed="right">
@@ -177,7 +215,7 @@ async function onDelete(row: DictItem) {
           </el-table-column>
         </el-table>
         <Pagination
-          :total="(dictMap[g.key] && dictMap[g.key].total) || 0"
+          :total="filteredTotal(g.key)"
           :page-size="pageSize"
           :current-page="(dictMap[g.key] && dictMap[g.key].pageNum) || 1"
           @current-change="(p: number) => onPageChange(g.key, p)"
@@ -223,10 +261,17 @@ async function onDelete(row: DictItem) {
   padding: 16px;
   border-radius: 8px;
 }
-.tab-toolbar {
-  margin-bottom: 12px;
+.toolbar {
+  margin-bottom: 16px;
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+.filter-input {
+  width: 240px;
+}
+.spacer {
+  flex: 1;
 }
 .hint {
   margin-top: 10px;

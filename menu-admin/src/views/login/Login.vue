@@ -44,7 +44,7 @@ async function onSubmit() {
   <div class="login-page">
     <div class="login-card">
       <div class="title">
-        <span class="dot"></span>烟火小食单
+        <span class="dot"></span>咕嘟小食单
       </div>
       <div class="subtitle">家庭菜谱 · 菜单 · 营养管理后台</div>
 

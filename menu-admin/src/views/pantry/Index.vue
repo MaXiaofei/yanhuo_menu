@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   listPantry,
@@ -14,29 +14,50 @@ import { listByGroup, type DictItem } from '@/api/dict'
 import Pagination from '@/components/Pagination.vue'
 
 const loading = ref(false)
-const list = ref<PantryVO[]>([])
-const total = ref(0)
+const allList = ref<PantryVO[]>([])
+const keyword = ref('')
 const pageNum = ref(1)
 const pageSize = 20
 
-// 食材下拉项需含 unitId，选食材后自动带入单位（默认带，允许调）
-const ingredients = ref<{ id: number; name: string; unitId: number }[]>([])
-const unitOptions = ref<DictItem[]>([])
+// 食材名称过滤（前端本地，数据量小）
+const filteredList = computed<PantryVO[]>(() => {
+  const kw = keyword.value.trim().toLowerCase()
+  if (!kw) return allList.value
+  return allList.value.filter((p) => (p.ingredientName || `#${p.ingredientId}`).toLowerCase().includes(kw))
+})
+
+const list = computed<PantryVO[]>(() => {
+  const start = (pageNum.value - 1) * pageSize
+  return filteredList.value.slice(start, start + pageSize)
+})
+
+const total = computed(() => filteredList.value.length)
+watch(keyword, () => {
+  pageNum.value = 1
+})
 
 async function load() {
   loading.value = true
   try {
-    const page = await listPantry({ pageNum: pageNum.value, pageSize })
-    list.value = page.records || []
-    total.value = page.total || 0
+    // 后端不支持 keyword，拉全量后前端过滤分页（数据量小）
+    const page = await listPantry({ pageNum: 1, pageSize: 999 })
+    allList.value = page.records || []
+    pageNum.value = 1
   } finally {
     loading.value = false
   }
 }
 
+function onSearch() {
+  pageNum.value = 1
+}
+
+// 食材下拉项需含 unitId，选食材后自动带入单位（默认带，允许调）
+const ingredients = ref<{ id: number; name: string; unitId: number }[]>([])
+const unitOptions = ref<DictItem[]>([])
+
 function onPageChange(p: number) {
   pageNum.value = p
-  load()
 }
 
 async function loadOptions() {
@@ -150,6 +171,15 @@ const tableRowClass = ({ row }: { row: PantryVO }) => {
 <template>
   <div class="page">
     <div class="toolbar">
+      <el-input
+        v-model="keyword"
+        placeholder="食材名称搜索"
+        clearable
+        class="filter-input"
+        @keyup.enter="onSearch"
+      />
+      <el-button type="primary" @click="onSearch">搜索</el-button>
+      <div class="spacer" />
       <el-button type="primary" @click="openCreate">新增库存</el-button>
     </div>
     <el-table v-loading="loading" :data="list" border :row-class-name="tableRowClass">
@@ -248,7 +278,16 @@ const tableRowClass = ({ row }: { row: PantryVO }) => {
   border-radius: 8px;
 }
 .toolbar {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.filter-input {
+  width: 240px;
+}
+.spacer {
+  flex: 1;
 }
 .mini {
   font-size: 12px;

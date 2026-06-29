@@ -57,7 +57,7 @@ async function onLogout() {
   <div class="layout">
     <aside class="sidebar">
       <div class="logo">
-        <span class="dot"></span>烟火小食单
+        <span class="dot"></span>咕嘟小食单
       </div>
       <el-menu class="side-menu" router :default-active="route.path">
         <el-menu-item v-for="m in menus" :key="m.path" :index="m.path">
