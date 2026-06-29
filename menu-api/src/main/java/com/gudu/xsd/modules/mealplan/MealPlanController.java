@@ -71,6 +71,13 @@ public class MealPlanController {
         return R.ok(svc.applyTemplate(templateId, planId));
     }
 
+    /** 复制上周排菜到本周：把 srcPlanId 的 items 复制到 planId（日期偏移 7 天）。 */
+    @PostMapping("/{planId}/copy-from/{srcPlanId}")
+    @MpPerm("menu.plan")
+    public R<Integer> copyFrom(@PathVariable Long planId, @PathVariable Long srcPlanId) {
+        return R.ok(svc.copyPlanItems(srcPlanId, planId));
+    }
+
     /** 模板列表。 */
     @GetMapping("/templates")
     public R<List<MenuTemplate>> templates() {

@@ -57,17 +57,16 @@ public class MenuRecommender {
     public List<MenuCandidate> recommend(List<CandidateDish> candidates, Constraints cons,
                                          List<String> allergies, BigDecimal budget,
                                          String scope, long seed) {
-        // 1. 过滤：健康上限 + 过敏
+        // 1. 过滤：过敏原硬过滤（食物过敏不能软化）；健康约束改为软扣分（不排除）
         List<CandidateDish> pool = new ArrayList<>();
         Set<String> allergy = allergies == null ? Set.of() : new HashSet<>(allergies);
         for (CandidateDish d : candidates) {
-            if (!healthOk(d, cons)) continue;
-            if (!allergyOk(d, allergy)) continue;
-            pool.add(d);
+            if (!allergyOk(d, allergy)) continue;  // 过敏原仍硬过滤
+            pool.add(d);  // 健康超标的不排除，进打分扣分
         }
         if (pool.isEmpty()) return List.of();
 
-        // 2. 组合：单菜 + 两菜配对，过滤超预算
+        // 2. 组合：单菜 + 两菜配对，过滤超预算 + 双超标排除
         List<List<CandidateDish>> combos = new ArrayList<>();
         for (CandidateDish d : pool) {
             if (withinBudget(List.of(d), budget)) combos.add(List.of(d));
@@ -75,17 +74,20 @@ public class MenuRecommender {
         for (int i = 0; i < pool.size(); i++) {
             for (int j = i + 1; j < pool.size(); j++) {
                 List<CandidateDish> pair = List.of(pool.get(i), pool.get(j));
-                if (withinBudget(pair, budget)) combos.add(pair);
+                if (!withinBudget(pair, budget)) continue;
+                // 配额规则：两道都超标 → 排除该组合
+                if (comboOverLimit(pair, cons)) continue;
+                combos.add(pair);
             }
         }
         if (combos.isEmpty()) return List.of();
 
-        // 3. 打分
+        // 3. 打分（含软扣分）
         List<Scored> scored = new ArrayList<>();
         for (List<CandidateDish> combo : combos) {
             scored.add(new Scored(combo, score(combo, cons)));
         }
-        // 4. 排序：score 降序，等分用 seed 确定性扰动（避免每次顺序不同）
+        // 4. 排序：score 降序，等分用 seed 确定性扰动
         Random rnd = new Random(seed);
         scored.sort((a, b) -> {
             int cmp = Double.compare(b.score, a.score);
@@ -93,18 +95,16 @@ public class MenuRecommender {
             return Integer.compare(rnd.nextInt(), rnd.nextInt());
         });
 
-        // 5. 限量 + 去重（DAY 1 组 / WEEK 3 组），尽量让组之间菜不同
+        // 5. 限量 + 去重
         int limit = "WEEK".equalsIgnoreCase(scope) ? 3 : 1;
         List<MenuCandidate> result = new ArrayList<>();
         Set<Long> usedDishes = new HashSet<>();
-        // 第一轮：贪心选互不重叠的组
         for (Scored s : scored) {
             if (result.size() >= limit) break;
             if (s.dishes.stream().anyMatch(d -> usedDishes.contains(d.id()))) continue;
             result.add(toCandidate(s));
             s.dishes.forEach(d -> usedDishes.add(d.id()));
         }
-        // 第二轮：若凑不齐 limit，放宽允许重叠
         for (Scored s : scored) {
             if (result.size() >= limit) break;
             result.add(toCandidate(s));
@@ -112,20 +112,30 @@ public class MenuRecommender {
         return result.size() > limit ? result.subList(0, limit) : result;
     }
 
-    // ---------------- 过滤 ----------------
+    // ---------------- 软约束：配额 + 组合总量 ----------------
 
-    /** 单菜营养是否在约束内：sugarMax / calMax 命中即超剔除。 */
-    private static boolean healthOk(CandidateDish d, Constraints cons) {
-        if (cons == null) return true;
+    /** 判断单道菜是否超标（用于配额判断）。 */
+    private static boolean isOverLimit(CandidateDish d, Constraints cons) {
+        if (cons == null) return false;
         if (cons.sugarMax() != null) {
             BigDecimal v = d.nutrition() == null ? null : d.nutrition().get(METRIC_SUGAR);
-            if (v != null && v.compareTo(cons.sugarMax()) > 0) return false;
+            if (v != null && v.compareTo(cons.sugarMax()) > 0) return true;
         }
         if (cons.calMax() != null) {
             BigDecimal v = d.nutrition() == null ? null : d.nutrition().get(METRIC_CAL);
-            if (v != null && v.compareTo(cons.calMax()) > 0) return false;
+            if (v != null && v.compareTo(cons.calMax()) > 0) return true;
         }
-        return true;
+        return false;
+    }
+
+    /** 配额规则：组合中超过 1 道菜超标 → 排除该组合。 */
+    private static boolean comboOverLimit(List<CandidateDish> combo, Constraints cons) {
+        if (cons == null) return false;
+        int overCount = 0;
+        for (CandidateDish d : combo) {
+            if (isOverLimit(d, cons)) overCount++;
+        }
+        return overCount > 1;
     }
 
     /** 菜名/食材是否不含过敏食材。 */
@@ -162,16 +172,45 @@ public class MenuRecommender {
         return sum;
     }
 
-    /** 打分：蛋白总量为主，组合菜数小奖励（鼓励搭配）。 */
+    /**
+     * 打分：蛋白总量为主 + 搭配奖励 + 健康软扣分。
+     * 软扣分：每道超标菜扣偏离比例的惩罚分，但不归零（偶尔可出现）。
+     */
     private static double score(List<CandidateDish> combo, Constraints cons) {
         double protein = 0;
         for (CandidateDish d : combo) {
             BigDecimal p = d.nutrition() == null ? null : d.nutrition().get(METRIC_PROTEIN);
             if (p != null) protein += p.doubleValue();
         }
-        // 搭配奖励：两菜比单菜略加分
         double comboBonus = combo.size() >= 2 ? 1.0 : 0.0;
-        return protein + comboBonus;
+        // 软扣分：超标菜按偏离程度扣分
+        double penalty = 0;
+        if (cons != null) {
+            for (CandidateDish d : combo) {
+                penalty += overLimitPenalty(d, cons);
+            }
+        }
+        return protein + comboBonus - penalty;
+    }
+
+    /** 超标惩罚：偏离越大扣越多。轻微超标扣少，严重超标扣多。 */
+    private static double overLimitPenalty(CandidateDish d, Constraints cons) {
+        double penalty = 0;
+        if (cons.sugarMax() != null && cons.sugarMax().compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal v = d.nutrition() == null ? null : d.nutrition().get(METRIC_SUGAR);
+            if (v != null && v.compareTo(cons.sugarMax()) > 0) {
+                double ratio = v.doubleValue() / cons.sugarMax().doubleValue();
+                penalty += (ratio - 1.0) * 5.0; // 超标 10% 扣 0.5 分，超标 100% 扣 5 分
+            }
+        }
+        if (cons.calMax() != null && cons.calMax().compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal v = d.nutrition() == null ? null : d.nutrition().get(METRIC_CAL);
+            if (v != null && v.compareTo(cons.calMax()) > 0) {
+                double ratio = v.doubleValue() / cons.calMax().doubleValue();
+                penalty += (ratio - 1.0) * 5.0;
+            }
+        }
+        return penalty;
     }
 
     // ---------------- 组装 ----------------

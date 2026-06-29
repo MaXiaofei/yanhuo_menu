@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../core/api_client.dart';
 import '../core/theme.dart';
 import '../stores/auth_store.dart';
 import '../stores/member_store.dart';
@@ -15,12 +16,34 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  int _dishCount = 0;
+  int _pantryCount = 0;
+  int _logCount = 0;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<MemberStore>().load();
+      _loadStats();
     });
+  }
+
+  Future<void> _loadStats() async {
+    try {
+      final dishes = await ApiClient.instance.get('/dish/search', query: {'pageNum': 1, 'pageSize': 1});
+      final pantry = await ApiClient.instance.get('/pantry', query: {'pageNum': 1, 'pageSize': 1});
+      final today = DateTime.now();
+      final dateStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+      final log = await ApiClient.instance.get('/dailylog', query: {'date': dateStr});
+      if (mounted) {
+        setState(() {
+          _dishCount = (dishes is Map) ? (dishes['total'] as num?)?.toInt() ?? 0 : 0;
+          _pantryCount = (pantry is Map) ? (pantry['total'] as num?)?.toInt() ?? 0 : 0;
+          _logCount = (log is Map && log['items'] is List) ? (log['items'] as List).length : 0;
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -116,11 +139,11 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildStatsRow() {
     return Row(children: [
-      Expanded(child: _statCard('12+', '道菜品', '📖', AppColors.primary)),
+      Expanded(child: _statCard('$_dishCount', '道菜品', '📖', AppColors.primary)),
       const SizedBox(width: 8),
-      Expanded(child: _statCard('3', '餐记录', '🍽️', AppColors.saveGreen)),
+      Expanded(child: _statCard('$_logCount', '今日记录', '🍽️', AppColors.saveGreen)),
       const SizedBox(width: 8),
-      Expanded(child: _statCard('8', '件库存', '📦', AppColors.warnOrange)),
+      Expanded(child: _statCard('$_pantryCount', '件库存', '📦', AppColors.warnOrange)),
     ]);
   }
 

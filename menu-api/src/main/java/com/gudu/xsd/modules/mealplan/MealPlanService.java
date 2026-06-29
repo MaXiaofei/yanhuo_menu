@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.gudu.xsd.common.PageQuery;
+import com.gudu.xsd.modules.dish.mapper.DishMapper;
 import com.gudu.xsd.modules.mealplan.mapper.MealPlanItemMapper;
 import com.gudu.xsd.modules.mealplan.mapper.MealPlanMapper;
 import com.gudu.xsd.modules.mealplan.mapper.MenuTemplateMapper;
@@ -32,14 +33,17 @@ public class MealPlanService extends ServiceImpl<MealPlanMapper, MealPlan> {
 
     private final MealPlanItemMapper itemMapper;
     private final MenuTemplateMapper templateMapper;
+    private final DishMapper dishMapper;
 
     @Autowired
     public MealPlanService(MealPlanMapper planMapper,
                            MealPlanItemMapper itemMapper,
-                           MenuTemplateMapper templateMapper) {
+                           MenuTemplateMapper templateMapper,
+                           DishMapper dishMapper) {
         // planMapper 由 ServiceImpl 通过自身注入机制持有（baseMapper），此处仅为对齐测试的三参构造签名。
         this.itemMapper = itemMapper;
         this.templateMapper = templateMapper;
+        this.dishMapper = dishMapper;
     }
 
     // ===================== 纯函数（算法地基） =====================
@@ -83,13 +87,35 @@ public class MealPlanService extends ServiceImpl<MealPlanMapper, MealPlan> {
         return p.getId();
     }
 
-    /** 周计划详情：含 items。 */
+    /** 周计划详情：含 items（每项带 dishName）。 */
     public PlanDetail getPlan(Long planId) {
         MealPlan plan = getById(planId);
         List<MealPlanItem> items = itemMapper.selectList(
                 new QueryWrapper<MealPlanItem>().eq("plan_id", planId)
                         .orderByAsc("date").orderByAsc("sort").orderByAsc("id"));
+        fillDishNames(items);
         return new PlanDetail(plan, items);
+    }
+
+    /** 批量填充 dishName：查 dish 表，按 id 映射。 */
+    private void fillDishNames(List<MealPlanItem> items) {
+        if (items == null || items.isEmpty()) return;
+        List<Long> dishIds = items.stream()
+                .map(MealPlanItem::getDishId)
+                .filter(id -> id != null)
+                .distinct()
+                .toList();
+        if (dishIds.isEmpty()) return;
+        List<com.gudu.xsd.modules.dish.Dish> dishes = dishMapper.selectBatchIds(dishIds);
+        Map<Long, String> nameMap = new HashMap<>();
+        for (com.gudu.xsd.modules.dish.Dish d : dishes) {
+            nameMap.put(d.getId(), d.getName());
+        }
+        for (MealPlanItem item : items) {
+            if (item.getDishId() != null) {
+                item.setDishName(nameMap.getOrDefault(item.getDishId(), "#" + item.getDishId()));
+            }
+        }
     }
 
     /** 某周计划下所有排菜项。 */
@@ -152,6 +178,50 @@ public class MealPlanService extends ServiceImpl<MealPlanMapper, MealPlan> {
 
     public List<MenuTemplate> listTemplates() {
         return templateMapper.selectList(new QueryWrapper<MenuTemplate>().orderByDesc("id"));
+    }
+
+    /**
+     * 复制上周排菜到本周：把 srcPlanId 的所有 items 复制到 planId。
+     * 日期偏移 7 天（上周一 → 本周一）。重复项跳过。
+     */
+    @Transactional
+    public int copyPlanItems(Long srcPlanId, Long planId) {
+        List<MealPlanItem> srcItems = itemMapper.selectList(
+                new QueryWrapper<MealPlanItem>().eq("plan_id", srcPlanId));
+        if (srcItems.isEmpty()) return 0;
+
+        MealPlan srcPlan = getById(srcPlanId);
+        MealPlan dstPlan = getById(planId);
+        // 计算日期偏移：目标周的周一 - 源周的周一
+        long dayOffset = 0;
+        if (srcPlan != null && dstPlan != null
+                && srcPlan.getWeekStart() != null && dstPlan.getWeekStart() != null) {
+            dayOffset = java.time.temporal.ChronoUnit.DAYS.between(
+                    srcPlan.getWeekStart(), dstPlan.getWeekStart());
+        }
+
+        int n = 0;
+        for (MealPlanItem src : srcItems) {
+            MealPlanItem it = new MealPlanItem();
+            it.setPlanId(planId);
+            // 日期偏移
+            if (src.getDate() != null && dayOffset != 0) {
+                it.setDate(src.getDate().plusDays(dayOffset));
+            } else {
+                it.setDate(src.getDate());
+            }
+            it.setMeal(src.getMeal());
+            it.setDishId(src.getDishId());
+            it.setServingFactor(src.getServingFactor() != null ? src.getServingFactor() : java.math.BigDecimal.ONE);
+            it.setSort(src.getSort() != null ? src.getSort() : 0);
+            try {
+                itemMapper.insert(it);
+                n++;
+            } catch (org.springframework.dao.DuplicateKeyException ignore) {
+                // 同日同餐同菜已存在，跳过
+            }
+        }
+        return n;
     }
 
     public Long saveTemplate(MenuTemplate t) {

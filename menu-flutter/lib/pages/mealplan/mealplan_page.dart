@@ -1,0 +1,433 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../core/theme.dart';
+import '../../services/dish_service.dart';
+import '../../services/ingredient_service.dart';
+import '../../services/mealplan_service.dart';
+import '../../services/shopping_service.dart';
+
+/// 排菜计划页：竖向日期列表，每天按动态餐段展开。
+/// 支持翻周导航、份数选择、一键生成采购单。
+class MealPlanPage extends StatefulWidget {
+  const MealPlanPage({super.key});
+  @override
+  State<MealPlanPage> createState() => _MealPlanPageState();
+}
+
+class _MealPlanPageState extends State<MealPlanPage> {
+  // 周计划数据
+  List<MealPlan> _allPlans = [];
+  int _currentPlanIndex = 0;
+  PlanDetail? _detail;
+  bool _loading = true;
+
+  // 动态餐段
+  List<String> _meals = ['早餐', '午餐', '晚餐'];
+
+  // 菜名缓存
+  final Map<int, String> _dishNames = {};
+
+  // 选菜弹窗
+  String? _pickDate;
+  String? _pickMeal;
+  List<_DishLite> _dishSearchResults = [];
+
+  int? get _currentPlanId => _allPlans.isNotEmpty && _currentPlanIndex < _allPlans.length
+      ? _allPlans[_currentPlanIndex].id : null;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMeals();
+    _loadLatestPlan();
+  }
+
+  // ===== 餐段字典 =====
+  Future<void> _loadMeals() async {
+    try {
+      final items = await IngredientService.listDictByGroup('meal');
+      if (items.isNotEmpty) {
+        setState(() => _meals = items.map((e) => e.name).toList());
+      }
+    } catch (_) {}
+  }
+
+  // ===== 周计划加载 =====
+  Future<void> _loadLatestPlan() async {
+    setState(() => _loading = true);
+    try {
+      _allPlans = await MealPlanService.list(pageSize: 50);
+      if (_allPlans.isNotEmpty) {
+        _currentPlanIndex = 0;
+        await _loadPlan();
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _loadPlan() async {
+    final planId = _currentPlanId;
+    if (planId == null) return;
+    try {
+      _detail = await MealPlanService.getPlan(planId);
+      for (final it in _detail!.items) {
+        if (it.dishId != null && it.dishName != null) {
+          _dishNames[it.dishId!] = it.dishName!;
+        }
+      }
+    } catch (_) {}
+    if (mounted) setState(() {});
+  }
+
+  // ===== 翻周 =====
+  void _prevWeek() {
+    if (_currentPlanIndex < _allPlans.length - 1) {
+      _currentPlanIndex++;
+      _loadPlan();
+    }
+  }
+
+  void _nextWeek() {
+    if (_currentPlanIndex > 0) {
+      _currentPlanIndex--;
+      _loadPlan();
+    }
+  }
+
+  // ===== 复制上周 =====
+  Future<void> _copyFromPrev() async {
+    if (_currentPlanIndex >= _allPlans.length - 1) {
+      _snack('没有更早的计划可复制');
+      return;
+    }
+    final srcId = _allPlans[_currentPlanIndex + 1].id;
+    final dstId = _currentPlanId;
+    if (dstId == null) return;
+    try {
+      final count = await MealPlanService.copyFrom(srcId, dstId);
+      _snack('已复制 $count 项');
+      _loadPlan();
+    } catch (_) {
+      _snack('复制失败');
+    }
+  }
+
+  Future<void> _createWeek() async {
+    try {
+      final monday = _mondayOf(DateTime.now());
+      final dateStr = _fmtDate(monday);
+      final id = await MealPlanService.createPlan(dateStr);
+      _allPlans.insert(0, MealPlan(id: id, weekStart: _fmtDate(_mondayOf(DateTime.now())), name: '本周计划'));
+      _currentPlanIndex = 0;
+      await _loadPlan();
+      _snack('已创建本周计划');
+    } catch (_) {
+      _snack('创建失败');
+    }
+  }
+
+  // ===== 选菜 + 挂菜 =====
+
+  Future<void> _openPicker(String date, String meal) async {
+    _pickDate = date;
+    _pickMeal = meal;
+    _dishSearchResults = [];
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => _buildPickerSheet(ctx),
+    );
+  }
+
+  Widget _buildPickerSheet(BuildContext sheetCtx) {
+    String servings = '1';
+    return StatefulBuilder(
+      builder: (ctx, setSheetState) {
+        return Padding(
+          padding: EdgeInsets.only(
+              left: 16, right: 16, top: 20,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 16),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('$_pickMeal · 选菜', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            TextField(
+              decoration: InputDecoration(
+                hintText: '搜索菜品…',
+                prefixIcon: const Icon(Icons.search),
+                filled: true, fillColor: const Color(0xFFFAFAFA),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onChanged: (v) async {
+                if (v.trim().isEmpty) { setSheetState(() => _dishSearchResults = []); return; }
+                try {
+                  final r = await DishService.search(keyword: v.trim(), pageSize: 20);
+                  setSheetState(() {
+                    _dishSearchResults = r.records.map((d) => _DishLite(d.id, d.name)).toList();
+                  });
+                } catch (_) {}
+              },
+            ),
+            const SizedBox(height: 8),
+            // 份数选择
+            Row(children: [
+              const Text('份数', style: TextStyle(fontSize: 13)),
+              const SizedBox(width: 8),
+              for (final s in ['1', '2', '3'])
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: ChoiceChip(
+                    label: Text('×$s'),
+                    selected: servings == s,
+                    onSelected: (_) => setSheetState(() => servings = s),
+                  ),
+                ),
+            ]),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 220,
+              child: _dishSearchResults.isEmpty
+                  ? const Center(child: Text('搜索菜品', style: TextStyle(color: AppColors.textSecondary)))
+                  : ListView.builder(
+                      itemCount: _dishSearchResults.length,
+                      itemBuilder: (_, i) {
+                        final d = _dishSearchResults[i];
+                        return ListTile(
+                          dense: true,
+                          title: Text(d.name, style: const TextStyle(fontSize: 14)),
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            _doAdd(d, double.tryParse(servings) ?? 1);
+                          },
+                        );
+                      },
+                    ),
+            ),
+          ]),
+        );
+      },
+    );
+  }
+
+  Future<void> _doAdd(_DishLite dish, double servings) async {
+    if (_currentPlanId == null || _pickDate == null || _pickMeal == null) return;
+    try {
+      final result = await MealPlanService.addItem(_currentPlanId!, MealPlanItem(
+        date: _pickDate, meal: _pickMeal, dishId: dish.id, servingFactor: servings,
+      ));
+      _dishNames[dish.id] = dish.name;
+      _snack(result.hasDuplicate ? '同日同餐已有此菜' : '已挂菜：${dish.name}');
+      _loadPlan();
+    } catch (_) {
+      _snack('添加失败');
+    }
+  }
+
+  Future<void> _doRemove(MealPlanItem item) async {
+    if (item.id == null) return;
+    final name = _dishName(item.dishId);
+    try {
+      await MealPlanService.deleteItem(item.id!);
+      _snack('已移除：$name');
+      _loadPlan();
+    } catch (_) {
+      _snack('移除失败');
+    }
+  }
+
+  // ===== 一键生成采购单 =====
+
+  Future<void> _generateShopping() async {
+    if (_currentPlanId == null) return;
+    try {
+      await ShoppingService.generateFrom('plan', sourceId: _currentPlanId);
+      _snack('采购单已生成');
+      if (mounted) context.push('/shopping');
+    } catch (_) {
+      _snack('生成失败');
+    }
+  }
+
+  // ===== 工具 =====
+
+  String _dishName(int? dishId) {
+    if (dishId == null) return '?';
+    return _dishNames[dishId] ?? '#$dishId';
+  }
+
+  static DateTime _mondayOf(DateTime d) {
+    final wd = (d.weekday - 1) % 7;
+    return DateTime(d.year, d.month, d.day - wd);
+  }
+
+  static String _fmtDate(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  List<String> _weekDates() {
+    if (_detail?.plan.weekStart == null) return [];
+    final start = DateTime.tryParse(_detail!.plan.weekStart!);
+    if (start == null) return [];
+    return List.generate(7, (i) => _fmtDate(start.add(Duration(days: i))));
+  }
+
+  static const _weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), duration: const Duration(seconds: 2)));
+  }
+
+  // ===== UI =====
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Row(mainAxisSize: MainAxisSize.min, children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left),
+            onPressed: _currentPlanIndex < _allPlans.length - 1 ? _prevWeek : null,
+            iconSize: 22,
+          ),
+          Text(_detail?.plan.name ?? '排菜计划', style: const TextStyle(fontSize: 16)),
+          IconButton(
+            icon: const Icon(Icons.chevron_right),
+            onPressed: _currentPlanIndex > 0 ? _nextWeek : null,
+            iconSize: 22,
+          ),
+        ]),
+        actions: [
+          if (_allPlans.length > 1 && _currentPlanIndex < _allPlans.length - 1)
+            IconButton(
+              icon: const Icon(Icons.content_copy),
+              onPressed: _copyFromPrev,
+              tooltip: '复制上周',
+            ),
+          if (_detail != null)
+            IconButton(
+              icon: const Icon(Icons.shopping_cart_outlined),
+              onPressed: _generateShopping,
+              tooltip: '生成采购单',
+            ),
+          IconButton(
+            icon: const Icon(Icons.add_circle_outline),
+            onPressed: _createWeek,
+            tooltip: '新建本周计划',
+          ),
+        ],
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _detail == null
+              ? _buildEmpty()
+              : _buildPlan(),
+    );
+  }
+
+  Widget _buildEmpty() {
+    return Center(
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Text('还没有排菜计划', style: TextStyle(color: AppColors.textSecondary, fontSize: 15)),
+        const SizedBox(height: 16),
+        ElevatedButton.icon(
+          onPressed: _createWeek,
+          icon: const Icon(Icons.add, size: 18),
+          label: const Text('新建本周计划'),
+        ),
+      ]),
+    );
+  }
+
+  Widget _buildPlan() {
+    final dates = _weekDates();
+    final byDate = _detail!.itemsByDate();
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(14),
+      itemCount: dates.length,
+      itemBuilder: (_, i) {
+        final date = dates[i];
+        final dayItems = byDate[date] ?? [];
+        return _buildDayCard(date, i, dayItems);
+      },
+    );
+  }
+
+  Widget _buildDayCard(String date, int dayIndex, List<MealPlanItem> items) {
+    final md = date.length >= 10 ? '${date.substring(5, 7)}/${date.substring(8, 10)}' : date;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFFEEEEEE))),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Text('${_weekdays[dayIndex]} $md', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+            const Spacer(),
+            Text('${items.length}菜', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          ]),
+          const SizedBox(height: 8),
+          ..._meals.map((meal) => _buildMealSlot(date, meal, items)),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildMealSlot(String date, String meal, List<MealPlanItem> dayItems) {
+    final slotItems = dayItems.where((it) => it.meal == meal).toList();
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        SizedBox(
+          width: 56,
+          child: Text(meal, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+        ),
+        Expanded(
+          child: Wrap(spacing: 6, runSpacing: 4, children: [
+            ...slotItems.map((it) {
+              final name = it.dishName ?? _dishName(it.dishId);
+              return GestureDetector(
+                onLongPress: () => _doRemove(it),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withAlpha(15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '$name${it.servingFactor != null && it.servingFactor != 1 ? " ×${_fmtFactor(it.servingFactor!)}" : ""}',
+                    style: const TextStyle(fontSize: 12, color: AppColors.primary),
+                  ),
+                ),
+              );
+            }),
+            GestureDetector(
+              onTap: () => _openPicker(date, meal),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  border: Border.all(color: const Color(0xFFDDDDDD)),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Text('+', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              ),
+            ),
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  String _fmtFactor(double f) => f == f.roundToDouble() ? f.toInt().toString() : f.toStringAsFixed(1);
+}
+
+class _DishLite {
+  final int id;
+  final String name;
+  const _DishLite(this.id, this.name);
+}

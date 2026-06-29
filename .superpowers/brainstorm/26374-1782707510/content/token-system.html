@@ -1,0 +1,124 @@
+<style>
+.tk-wrap{font-family:-apple-system,"PingFang SC",system-ui,sans-serif;color:#241914;line-height:1.5}
+.tk-label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#A89890;font-weight:700;margin:0 0 10px}
+.tk-sec{margin-top:26px}
+.tk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px}
+.tk-swatch .box{height:48px;border-radius:8px;border:1px solid rgba(0,0,0,.06)}
+.tk-swatch .name{font-size:12px;margin-top:6px;color:#241914}
+.tk-swatch .hex{font-size:11px;color:#A89890;font-family:ui-monospace,monospace}
+.tk-space{display:flex;align-items:flex-end;gap:10px;margin-top:4px}
+.tk-space .col{display:flex;flex-direction:column;align-items:center;gap:4px}
+.tk-space .bar{background:#E8602C;border-radius:3px;width:26px}
+.tk-space .v{font-size:11px;color:#6B5950}
+.tk-rad{display:flex;gap:16px;margin-top:4px}
+.tk-rad .col{display:flex;flex-direction:column;align-items:center;gap:4px}
+.tk-rad .r{width:50px;height:50px;background:#E8602C;opacity:.9}
+.tk-rad .v{font-size:11px;color:#6B5950}
+.tk-type{display:flex;flex-direction:column;gap:2px;margin-top:4px}
+.tk-type span{color:#241914}
+.tk-type .ann{font-size:11px;color:#A89890;margin-left:8px}
+.tk-cmp{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}
+.tk-card2{border:1px solid #E8DCD0;border-radius:12px;padding:14px;background:#fff}
+.tk-card2 h4{margin:0 0 4px;font-size:14px;color:#241914}
+.tk-card2 .sub{font-size:11px;color:#A89890;margin:0 0 10px}
+.tk-dense{width:100%;border-collapse:collapse;background:#FFFAF5;border-radius:6px;overflow:hidden}
+.tk-dense td,.tk-dense th{font-size:11px;padding:4px 8px;border-bottom:1px solid #F2EAE0;text-align:left;color:#241914}
+.tk-loose{display:flex;flex-direction:column;gap:8px}
+.tk-loose .c{background:#FFFAF5;border:1px solid #F2EAE0;border-radius:12px;padding:10px 12px;font-size:13px;color:#241914}
+.tk-pill{display:inline-block;background:#E8602C;color:#fff;border-radius:999px;padding:1px 8px;font-size:10px;margin-left:6px}
+code{background:#F2EAE0;border-radius:4px;padding:1px 5px;font-size:12px;color:#6B5950}
+</style>
+
+<div class="tk-wrap">
+
+<h2>第一步 · 设计 Token 体系</h2>
+<p class="subtitle">从 <code>themes.ts</code> 的 5 个字段 → 一套完整「设计标尺」。所有间距/颜色/圆角/字号都从这里取值，这就是「协调」的底层。</p>
+
+<div class="tk-sec">
+  <div class="tk-label">① 共享品牌色（后台 + C 端都用，保持品牌统一）</div>
+  <div class="tk-grid">
+    <div class="tk-swatch"><div class="box" style="background:#E8602C"></div><div class="name">咕嘟暖橙 · 主色</div><div class="hex">#E8602C</div></div>
+    <div class="tk-swatch"><div class="box" style="background:#2EA66B"></div><div class="name">鲜蔬青绿 · 辅色</div><div class="hex">#2EA66B</div></div>
+  </div>
+</div>
+
+<div class="tk-sec">
+  <div class="tk-label">② 语义色（成功/警告/危险/信息 · 共享）</div>
+  <div class="tk-grid">
+    <div class="tk-swatch"><div class="box" style="background:#16A34A"></div><div class="name">Success</div><div class="hex">#16A34A</div></div>
+    <div class="tk-swatch"><div class="box" style="background:#F59E0B"></div><div class="name">Warning</div><div class="hex">#F59E0B</div></div>
+    <div class="tk-swatch"><div class="box" style="background:#DC2626"></div><div class="name">Danger</div><div class="hex">#DC2626</div></div>
+    <div class="tk-swatch"><div class="box" style="background:#64748B"></div><div class="name">Info</div><div class="hex">#64748B</div></div>
+  </div>
+</div>
+
+<div class="tk-sec">
+  <div class="tk-label">③ 中性色 · 暖灰系（文字/边框/背景 · 共享）</div>
+  <div class="tk-grid">
+    <div class="tk-swatch"><div class="box" style="background:#241914"></div><div class="name">文字 · 主</div><div class="hex">#241914</div></div>
+    <div class="tk-swatch"><div class="box" style="background:#6B5950"></div><div class="name">文字 · 次</div><div class="hex">#6B5950</div></div>
+    <div class="tk-swatch"><div class="box" style="background:#A89890"></div><div class="name">文字 · 弱</div><div class="hex">#A89890</div></div>
+    <div class="tk-swatch"><div class="box" style="background:#E8DCD0"></div><div class="name">边框</div><div class="hex">#E8DCD0</div></div>
+    <div class="tk-swatch"><div class="box" style="background:#F2EAE0"></div><div class="name">分割线</div><div class="hex">#F2EAE0</div></div>
+    <div class="tk-swatch"><div class="box" style="background:#FFFAF5;border:1px solid #E8DCD0"></div><div class="name">页面背景</div><div class="hex">#FFFAF5</div></div>
+  </div>
+</div>
+
+<div class="tk-sec">
+  <div class="tk-label">④ 间距阶梯（4px 基准 · 共享刻度）</div>
+  <div class="tk-space">
+    <div class="col"><div class="bar" style="height:4px"></div><div class="v">4</div></div>
+    <div class="col"><div class="bar" style="height:8px"></div><div class="v">8</div></div>
+    <div class="col"><div class="bar" style="height:12px"></div><div class="v">12</div></div>
+    <div class="col"><div class="bar" style="height:16px"></div><div class="v">16</div></div>
+    <div class="col"><div class="bar" style="height:24px"></div><div class="v">24</div></div>
+    <div class="col"><div class="bar" style="height:32px"></div><div class="v">32</div></div>
+    <div class="col"><div class="bar" style="height:48px"></div><div class="v">48</div></div>
+  </div>
+</div>
+
+<div class="tk-sec">
+  <div class="tk-label">⑤ 圆角 / 字号（共享刻度）</div>
+  <div class="tk-rad">
+    <div class="col"><div class="r" style="border-radius:4px"></div><div class="v">4 直角感</div></div>
+    <div class="col"><div class="r" style="border-radius:8px"></div><div class="v">8</div></div>
+    <div class="col"><div class="r" style="border-radius:12px"></div><div class="v">12 圆润感</div></div>
+    <div class="col"><div class="r" style="border-radius:999px"></div><div class="v">999 胶囊</div></div>
+  </div>
+  <div class="tk-type">
+    <span style="font-size:12px">咕嘟小食单<span class="ann">12 · 辅助文字</span></span>
+    <span style="font-size:14px">咕嘟小食单<span class="ann">14 · 后台正文基准</span></span>
+    <span style="font-size:16px">咕嘟小食单<span class="ann">16 · C 端正文基准</span></span>
+    <span style="font-size:18px;font-weight:600">咕嘟小食单<span class="ann">18 · 小标题</span></span>
+    <span style="font-size:24px;font-weight:700">咕嘟小食单<span class="ann">24 · 页面标题</span></span>
+  </div>
+</div>
+
+<div class="tk-sec">
+  <div class="tk-label">⑥ 两份设计语言 · 关键差异（同刻度，不同取值）</div>
+  <div class="tk-cmp">
+    <div class="tk-card2">
+      <h4>后台 · 管理端</h4>
+      <p class="sub">高效 / 密集 / 表格导向 · Element Plus</p>
+      <table class="tk-dense">
+        <tr><th>菜品</th><th>分类</th><th>状态</th></tr>
+        <tr><td>番茄炒蛋</td><td>家常</td><td>上架</td></tr>
+        <tr><td>清蒸鲈鱼</td><td>粤菜</td><td>上架</td></tr>
+        <tr><td>红烧肉</td><td>家常</td><td>下架</td></tr>
+      </table>
+      <p class="sub" style="margin-top:8px;margin-bottom:0">基准字号 14 · 圆角 4~8 · 间距偏紧</p>
+    </div>
+    <div class="tk-card2">
+      <h4>C 端 · 用户端（小程序+App）</h4>
+      <p class="sub">温暖 / 宽松 / 卡片导向 · uview-plus / Material</p>
+      <div class="tk-loose">
+        <div class="c">🍅 番茄炒蛋<span class="tk-pill">家常</span></div>
+        <div class="c">🐟 清蒸鲈鱼<span class="tk-pill">粤菜</span></div>
+        <div class="c">🥩 红烧肉<span class="tk-pill">家常</span></div>
+      </div>
+      <p class="sub" style="margin-top:8px;margin-bottom:0">基准字号 16 · 圆角 8~12 · 间距偏松</p>
+    </div>
+  </div>
+</div>
+
+</div>

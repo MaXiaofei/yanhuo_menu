@@ -1,8 +1,10 @@
 import 'package:go_router/go_router.dart';
 
+import '../pages/mealplan/mealplan_page.dart';
 import '../pages/pantry/list_page.dart';
 import '../pages/shopping/shopping_page.dart';
-import '../pages/coming_soon_page.dart';
+import '../pages/ai/estimate_page.dart';
+import '../pages/ai/recommend_page.dart';
 import '../pages/dailylog/daily_log_page.dart';
 import '../pages/dish/create_page.dart';
 import '../pages/dish/detail_page.dart';
@@ -54,13 +56,13 @@ GoRouter createRouter(AuthStore auth) {
       // 以下仍为占位
       GoRoute(
           path: '/ai-recommend',
-          builder: (_, __) => const ComingSoonPage(title: 'AI 帮我定菜单')),
+          builder: (_, __) => const AiRecommendPage()),
       GoRoute(
           path: '/ai-estimate',
-          builder: (_, __) => const ComingSoonPage(title: 'AI 估营养')),
+          builder: (_, __) => const AiEstimatePage()),
       GoRoute(
           path: '/mealplan',
-          builder: (_, __) => const ComingSoonPage(title: '周计划')),
+          builder: (_, __) => const MealPlanPage()),
       GoRoute(
           path: '/pantry',
           builder: (_, __) => const PantryListPage()),

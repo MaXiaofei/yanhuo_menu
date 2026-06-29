@@ -119,9 +119,9 @@ flutter run
 | 食材库存（全部/临期/不足 + 批量添加 + 手动扣减 + 单位自动匹配） | `/pantry` | ✅ P0 | `pages/pantry/List` |
 | 采购清单（plan/dish/menu/custom 四种生成 + 纯文字分享 + 品类分区） | `/shopping` | ✅ P0 | `pages/shopping/Shopping` |
 | 每日饮食记录（轻量+精准双模式 / 菜库选菜 / 日期滑动） | `/dailylog` | ✅ P0 | `pages/dailylog/DailyLog` |
-| 周计划 | `/mealplan` | 🚧 占位 | `pages/mealplan/Calendar` |
-| AI 定菜单 | `/ai-recommend` | 🚧 占位（后端已完：规则引擎+紧凑 prompt+缓存） | `pages/ai/Recommend` |
-| AI 估营养 | `/ai-estimate` | 🚧 占位（后端已完：prompt 收紧+aiNote 固定） | `pages/ai/Estimate` |
+| 周计划（竖向日期列表 × 4 餐段） | `/mealplan` | ✅ P0 | `pages/mealplan/MealPlan` |
+| AI 定菜单 | `/ai-recommend` | ✅ P0 | `pages/ai/Recommend` |
+| AI 估营养 | `/ai-estimate` | ✅ P0 | `pages/ai/Estimate` |
 
 > **待打磨**：菜品详情、菜单、周计划页面仍需精细化设计（当前为 MVP 基础版）。
 

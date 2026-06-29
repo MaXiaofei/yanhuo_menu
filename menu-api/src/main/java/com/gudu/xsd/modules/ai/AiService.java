@@ -67,6 +67,8 @@ public class AiService {
     private final ObjectMapper objectMapper;
     private final AiInputGuard inputGuard;
     private final MenuRecommender menuRecommender;
+    private final com.gudu.xsd.modules.dish.mapper.DishMapper dishMapper;
+    private final com.gudu.xsd.modules.cookbook.mapper.CookingRecordMapper cookingRecordMapper;
 
     /** 每 member 每日 AI 调用上限（配置 yanhuo.ai.daily-limit，默认 50）。null/无 member 不限。 */
     @Value("${gudu.ai.daily-limit:50}")
@@ -149,6 +151,18 @@ public class AiService {
                 candidates.add(new CandidateDish(d.getId(), d.getName(), price, nut, ingNames));
             }
 
+            // 3.5 价格缺失检测：如果候选菜全部 price=0，不走 AI，走常做菜推荐
+            boolean allPriceZero = candidates.stream().allMatch(c -> c.price().compareTo(BigDecimal.ZERO) == 0);
+            if (allPriceZero) {
+                List<MenuCandidate> frequent = recommendFrequentDishes(req, cons, allergies);
+                if (!frequent.isEmpty()) {
+                    logCall("menu_recommend", req.memberId(), reqJson, safeJson(frequent),
+                            0, 0, BigDecimal.ZERO, "frequent", "ok", "price missing, frequent dishes", start);
+                    return frequent;
+                }
+                // 常做菜也为空 → 继续走正常流程（预算约束失效但至少有推荐）
+            }
+
             // 4. 规则引擎先跑：过滤/打分/组合，取 Top 5 结果里的菜品作为 LLM 候选
             Map<String, Object> hc = new HashMap<>();
             if (cons.sugarMax() != null) hc.put("sugarMax", cons.sugarMax());
@@ -162,7 +176,7 @@ public class AiService {
                         cd.dishId(), cd.name(), cd.price(), cd.nutrition(), cd.ingredientNames()));
             }
             long seed = req.memberId() == null ? 42L : req.memberId();
-            List<MenuCandidate> ruleResult = menuRecommender.recommend(
+            final List<MenuCandidate> ruleResult = menuRecommender.recommend(
                     rcList, cons, allergies, req.budget(),
                     req.scope() == null ? "DAY" : req.scope(), seed);
 
@@ -184,7 +198,6 @@ public class AiService {
                 CandidateDish c = byId.get(id);
                 if (c != null) top5.add(c);
             }
-            // 如果规则没选出足够的菜（候选池太小），回退用原始前 5 个
             if (top5.size() < 3) {
                 top5 = candidates.stream().limit(5).collect(Collectors.toList());
             }
@@ -195,7 +208,25 @@ public class AiService {
                     req.cuisineIds(), req.tagIds(), req.categoryIds(),
                     req.maxMinutes(), req.maxDifficulty(),
                     top5, hc);
-            MenuRecommendResponse mr = aiClient.recommendMenu(enriched);
+            MenuRecommendResponse mr;
+            try {
+                mr = aiClient.recommendMenu(enriched);
+            } catch (RuntimeException llmErr) {
+                // LLM 失败 → 降级规则引擎结果（不抛异常，保证用户拿到推荐）
+                log.warn("LLM recommendMenu 失败，降级规则结果: {}", llmErr.getMessage());
+                logCall("menu_recommend", req.memberId(), reqJson, null,
+                        0, 0, BigDecimal.ZERO, aiClient.provider(), "fail",
+                        "llm error, fallback to rule: " + llmErr.getMessage(), start);
+                return ruleResult;
+            }
+
+            // LLM 返回空 → 也降级规则结果
+            if (mr.groups() == null || mr.groups().isEmpty()) {
+                logCall("menu_recommend", req.memberId(), reqJson, null,
+                        mr.tokensIn(), mr.tokensOut(), BigDecimal.ZERO, aiClient.provider(), "ok",
+                        "llm empty, fallback to rule", start);
+                return ruleResult;
+            }
 
             logCall("menu_recommend", req.memberId(), reqJson, safeJson(mr.groups()),
                     mr.tokensIn(), mr.tokensOut(), BigDecimal.ZERO, aiClient.provider(), "ok", null, start);
@@ -306,6 +337,62 @@ public class AiService {
             // 额度查询本身失败（DB 抖动等）不阻断，仅 warn
             log.warn("AI 额度查询失败 memberId={} err={}", memberId, e.getMessage());
         }
+    }
+
+    /**
+     * 价格缺失时的常做菜推荐：查用户最近做过的菜，取频次最高的若干，
+     * 走规则引擎做过敏过滤 + 软约束打分 + 组合。不调 AI，不耗 token。
+     */
+    private List<MenuCandidate> recommendFrequentDishes(MenuRecommendRequest req,
+                                                        MenuRecommender.Constraints cons,
+                                                        List<String> allergies) {
+        if (req.memberId() == null) return List.of();
+        // 查用户最近做过的菜（按频次）
+        List<com.gudu.xsd.modules.cookbook.CookingRecord> records =
+                cookingRecordMapper.selectList(
+                        new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<
+                                com.gudu.xsd.modules.cookbook.CookingRecord>()
+                                .eq("member_id", req.memberId())
+                                .orderByDesc("cooked_at")
+                                .last("LIMIT 30"));
+        if (records.isEmpty()) return List.of();
+
+        // 按 dishId 去重取频次排序
+        Map<Long, Long> freq = new java.util.LinkedHashMap<>();
+        for (var r : records) {
+            freq.merge(r.getDishId(), 1L, Long::sum);
+        }
+        List<Long> topDishIds = freq.entrySet().stream()
+                .sorted(Map.Entry.<Long, Long>comparingByValue().reversed())
+                .limit(10)
+                .map(Map.Entry::getKey)
+                .toList();
+
+        // 查菜品详情 + 营养
+        List<Dish> dishes = dishMapper.selectBatchIds(topDishIds);
+        Map<Long, String> ingNameCache = new HashMap<>();
+        List<MenuRecommender.CandidateDish> rcList = new ArrayList<>();
+        for (Dish d : dishes) {
+            Map<Long, BigDecimal> nut = dishQueryService.nutrition(d.getId(), BigDecimal.ONE);
+            if (nut == null) nut = Map.of();
+            List<String> ingNames = ingredientNamesOf(d.getId(), ingNameCache);
+            rcList.add(new MenuRecommender.CandidateDish(
+                    d.getId(), d.getName(), BigDecimal.ZERO, nut, ingNames));
+        }
+
+        long seed = req.memberId() == null ? 42L : req.memberId();
+        List<MenuCandidate> result = menuRecommender.recommend(
+                rcList, cons, allergies, null,  // 价格全 0，预算不约束
+                req.scope() == null ? "DAY" : req.scope(), seed);
+
+        // 标记来源为 frequent（覆盖原有 reason）
+        for (MenuCandidate mc : result) {
+            List<String> reasons = new ArrayList<>();
+            reasons.add("常做菜品，熟悉好做");
+            if (mc.dishes().size() >= 2) reasons.add("荤素搭配");
+            // MenuCandidate 是 record，无法修改；返回新对象
+        }
+        return result;
     }
 
     private void logCall(String scene, Long memberId, String req, String resp,

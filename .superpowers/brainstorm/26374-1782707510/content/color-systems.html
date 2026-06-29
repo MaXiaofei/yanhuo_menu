@@ -1,0 +1,123 @@
+<style>
+.cs-wrap{font-family:-apple-system,"PingFang SC",system-ui,sans-serif;color:#241914;line-height:1.5}
+.cs-group{margin-top:22px}
+.cs-gtitle{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#A89890;font-weight:700;margin-bottom:12px}
+.cs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.pc{border:2px solid #E8DCD0;border-radius:14px;padding:14px;background:#fff;cursor:pointer;transition:.15s}
+.pc:hover{border-color:#bbb}
+.pc.selected{border-color:#E8602C;box-shadow:0 0 0 3px rgba(232,96,44,.15)}
+.pc .pname{font-size:15px;font-weight:700;margin:0}
+.pc .ptag{font-size:11px;color:#A89890;margin:2px 0 10px}
+.demo{border-radius:10px;padding:12px;border:1px solid rgba(0,0,0,.05)}
+.demo-img{height:46px;border-radius:8px;margin-bottom:8px;display:flex;align-items:center;padding:0 10px;color:#fff;font-size:12px;font-weight:600}
+.demo-title{font-size:14px;font-weight:600}
+.demo-sub{font-size:11px;opacity:.7;margin:2px 0 8px}
+.demo-row{display:flex;gap:6px;margin-bottom:10px}
+.demo-pill{font-size:10px;padding:2px 8px;border-radius:999px;color:#fff;font-weight:600}
+.demo-btn{border:none;border-radius:8px;color:#fff;font-size:12px;padding:6px 0;width:100%;font-weight:600;cursor:pointer}
+.hex-row{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
+.hex-row span{display:flex;align-items:center;gap:4px;font-size:10px;color:#6B5950;font-family:ui-monospace,monospace}
+.hex-row i{width:12px;height:12px;border-radius:3px;display:inline-block;border:1px solid rgba(0,0,0,.1)}
+.hint{font-size:12px;color:#6B5950;margin-top:14px;background:#FFFAF5;border:1px solid #E8DCD0;border-radius:8px;padding:8px 12px}
+</style>
+
+<div class="cs-wrap">
+
+<h2>换一套色系 · 温馨 vs 简约</h2>
+<p class="subtitle">咕嘟小食单 = 家庭私厨助手。下面 6 套，每套都用真实菜品卡预览效果。<b>点击卡片即可选中</b>，选中后我在终端读到你选的。</p>
+
+<div class="cs-group">
+  <div class="cs-gtitle">🌸 温馨方向 · 暖色、食欲、家庭温度</div>
+  <div class="cs-grid">
+
+    <div class="pc" data-choice="w1" onclick="toggleSelect(this)">
+      <p class="pname">番茄暖橙</p>
+      <p class="ptag">明亮 · 番茄南瓜 · 贴近现有品牌</p>
+      <div class="demo" style="background:#FFFAF5">
+        <div class="demo-img" style="background:linear-gradient(135deg,#E8602C,#F4A261)">今日推荐</div>
+        <div class="demo-title" style="color:#241914">番茄炒蛋</div>
+        <div class="demo-sub" style="color:#6B5950">家常 · 15 分钟 · 低脂</div>
+        <div class="demo-row"><span class="demo-pill" style="background:#E8602C">推荐</span><span class="demo-pill" style="background:#F4A261">儿童友好</span></div>
+        <button class="demo-btn" style="background:#E8602C">查看做法</button>
+      </div>
+      <div class="hex-row"><span><i style="background:#E8602C"></i>主 E8602C</span><span><i style="background:#F4A261"></i>辅 F4A261</span><span><i style="background:#FFFAF5"></i>底 FFFAF5</span></div>
+    </div>
+
+    <div class="pc" data-choice="w2" onclick="toggleSelect(this)">
+      <p class="pname">陶土烘焙</p>
+      <p class="ptag">沉稳 · 陶锅手作 · 烘焙温度</p>
+      <div class="demo" style="background:#FBF6EF">
+        <div class="demo-img" style="background:linear-gradient(135deg,#C0573C,#D9A05B)">今日推荐</div>
+        <div class="demo-title" style="color:#3A2A22">番茄炒蛋</div>
+        <div class="demo-sub" style="color:#8A6F5C">家常 · 15 分钟 · 低脂</div>
+        <div class="demo-row"><span class="demo-pill" style="background:#C0573C">推荐</span><span class="demo-pill" style="background:#D9A05B">儿童友好</span></div>
+        <button class="demo-btn" style="background:#C0573C">查看做法</button>
+      </div>
+      <div class="hex-row"><span><i style="background:#C0573C"></i>主 C0573C</span><span><i style="background:#D9A05B"></i>辅 D9A05B</span><span><i style="background:#FBF6EF"></i>底 FBF6EF</span></div>
+    </div>
+
+    <div class="pc" data-choice="w3" onclick="toggleSelect(this)">
+      <p class="pname">酱红醇厚</p>
+      <p class="ptag">浓郁 · 红酒炖肉 · 果酱食欲</p>
+      <div class="demo" style="background:#FBF5F2">
+        <div class="demo-img" style="background:linear-gradient(135deg,#B23A48,#E08E45)">今日推荐</div>
+        <div class="demo-title" style="color:#2E1F22">番茄炒蛋</div>
+        <div class="demo-sub" style="color:#7A5F60">家常 · 15 分钟 · 低脂</div>
+        <div class="demo-row"><span class="demo-pill" style="background:#B23A48">推荐</span><span class="demo-pill" style="background:#E08E45">儿童友好</span></div>
+        <button class="demo-btn" style="background:#B23A48">查看做法</button>
+      </div>
+      <div class="hex-row"><span><i style="background:#B23A48"></i>主 B23A48</span><span><i style="background:#E08E45"></i>辅 E08E45</span><span><i style="background:#FBF5F2"></i>底 FBF5F2</span></div>
+    </div>
+
+  </div>
+</div>
+
+<div class="cs-group">
+  <div class="cs-gtitle"> ◾ 简约方向 · 干净、克制、现代</div>
+  <div class="cs-grid">
+
+    <div class="pc" data-choice="s1" onclick="toggleSelect(this)">
+      <p class="pname">燕尾墨黑</p>
+      <p class="ptag">杂志极简 · 强对比 · 一抹橙强调</p>
+      <div class="demo" style="background:#FAFAF9">
+        <div class="demo-img" style="background:#2B2B2B">今日推荐</div>
+        <div class="demo-title" style="color:#2B2B2B">番茄炒蛋</div>
+        <div class="demo-sub" style="color:#888">家常 · 15 分钟 · 低脂</div>
+        <div class="demo-row"><span class="demo-pill" style="background:#2B2B2B">推荐</span><span class="demo-pill" style="background:#E8590C">儿童友好</span></div>
+        <button class="demo-btn" style="background:#2B2B2B">查看做法</button>
+      </div>
+      <div class="hex-row"><span><i style="background:#2B2B2B"></i>主 2B2B2B</span><span><i style="background:#E8590C"></i>强调 E8590C</span><span><i style="background:#FAFAF9"></i>底 FAFAF9</span></div>
+    </div>
+
+    <div class="pc" data-choice="s2" onclick="toggleSelect(this)">
+      <p class="pname">鼠尾草绿</p>
+      <p class="ptag">低饱和 · 北欧宁静 · 自然</p>
+      <div class="demo" style="background:#F5F4F0">
+        <div class="demo-img" style="background:linear-gradient(135deg,#6B8E7F,#B08968)">今日推荐</div>
+        <div class="demo-title" style="color:#33403A">番茄炒蛋</div>
+        <div class="demo-sub" style="color:#7C8A82">家常 · 15 分钟 · 低脂</div>
+        <div class="demo-row"><span class="demo-pill" style="background:#6B8E7F">推荐</span><span class="demo-pill" style="background:#B08968">儿童友好</span></div>
+        <button class="demo-btn" style="background:#6B8E7F">查看做法</button>
+      </div>
+      <div class="hex-row"><span><i style="background:#6B8E7F"></i>主 6B8E7F</span><span><i style="background:#B08968"></i>辅 B08968</span><span><i style="background:#F5F4F0"></i>底 F5F4F0</span></div>
+    </div>
+
+    <div class="pc" data-choice="s3" onclick="toggleSelect(this)">
+      <p class="pname">雾霭灰蓝</p>
+      <p class="ptag">清爽 · 干净 · 信赖感</p>
+      <div class="demo" style="background:#F6F8FA">
+        <div class="demo-img" style="background:linear-gradient(135deg,#4E7493,#C9A66B)">今日推荐</div>
+        <div class="demo-title" style="color:#2A3B47">番茄炒蛋</div>
+        <div class="demo-sub" style="color:#7A8A95">家常 · 15 分钟 · 低脂</div>
+        <div class="demo-row"><span class="demo-pill" style="background:#4E7493">推荐</span><span class="demo-pill" style="background:#C9A66B">儿童友好</span></div>
+        <button class="demo-btn" style="background:#4E7493">查看做法</button>
+      </div>
+      <div class="hex-row"><span><i style="background:#4E7493"></i>主 4E7493</span><span><i style="background:#C9A66B"></i>辅 C9A66B</span><span><i style="background:#F6F8FA"></i>底 F6F8FA</span></div>
+    </div>
+
+  </div>
+</div>
+
+<div class="hint">💡 选不出来没关系——你也可以告诉我「喜欢 W1 但想再暗一点」或「W2 和 S2 之间纠结」，我基于你中意的方向再出变体。</div>
+
+</div>

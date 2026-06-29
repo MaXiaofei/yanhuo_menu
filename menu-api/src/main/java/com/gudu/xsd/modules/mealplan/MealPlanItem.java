@@ -1,6 +1,7 @@
 package com.gudu.xsd.modules.mealplan;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -29,4 +30,8 @@ public class MealPlanItem {
     private BigDecimal servingFactor;
 
     private Integer sort;
+
+    /** 菜品名（非 DB 字段，getPlan 时 JOIN 填充）。 */
+    @TableField(exist = false)
+    private String dishName;
 }

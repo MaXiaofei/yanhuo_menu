@@ -436,6 +436,8 @@ public class ShoppingService extends ServiceImpl<ShoppingListMapper, ShoppingLis
             item.setListId(list.getId());
             item.setPurchased(0);
             item.setReferenceGrams(pi.gramsEstimate());
+            // total_amount 列 NOT NULL 无默认值，兜底设 0
+            item.setTotalAmount(BigDecimal.ZERO);
 
             Long matchedId = ShoppingTextParser.matchIngredient(pi.name(), pool);
             if (matchedId != null) {
