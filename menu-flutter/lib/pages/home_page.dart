@@ -7,8 +7,7 @@ import '../stores/auth_store.dart';
 import '../stores/member_store.dart';
 import '../widgets/member_bar.dart';
 
-/// 首页 hub（复刻 menu-mini/src/pages/index/Index.vue）。
-/// 顶部「当前就餐成员」切换条 + 一列功能按钮。保留单 hub 架构，与小程序一致。
+/// 首页 — 场景分区的功能入口 + 统计概览。
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
   @override
@@ -19,45 +18,150 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    // 进入首页加载成员（对应小程序 onShow → member.load()）
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<MemberStore>().load();
     });
   }
 
-  Widget _entry(String label, VoidCallback onTap, {Color? color}) => Padding(
-        padding: const EdgeInsets.only(top: 12),
-        child: ElevatedButton(
-          style: color != null
-              ? ElevatedButton.styleFrom(backgroundColor: color)
-              : null,
-          onPressed: onTap,
-          child: Text(label),
-        ),
-      );
-
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('小食单')),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const MemberBar(),
-              const SizedBox(height: 16),
-              _entry('浏览菜库', () => context.push('/dish')),
-              _entry('录入新菜', () => context.push('/create-dish')),
-              _entry('录入食材', () => context.push('/create-ingredient'),
-                  color: AppColors.warnOrange),
-              _entry('AI 帮我定菜单', () => context.push('/ai-recommend'),
-                  color: AppColors.warnOrange),
-              _entry('AI 估营养', () => context.push('/ai-estimate'),
-                  color: AppColors.warnOrange),
-              _entry('退出登录', () => context.read<AuthStore>().logout(),
-                  color: AppColors.warnRed),
-            ],
+  Widget build(BuildContext context) {
+    final hour = DateTime.now().hour;
+    final greeting = hour < 11 ? '早上好' : hour < 14 ? '中午好' : hour < 18 ? '下午好' : '晚上好';
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFFAF8F5),
+      appBar: AppBar(
+        title: const Text('咕嘟小食单'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            child: Row(children: [
+              Text('$greeting，今天给家人做什么好吃的？',
+                  style: const TextStyle(color: Colors.white70, fontSize: 13)),
+            ]),
           ),
         ),
-      );
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const MemberBar(),
+          const SizedBox(height: 16),
+          _buildStatsRow(),
+          const SizedBox(height: 20),
+
+          _sectionHeader('🍳', '厨房'),
+          const SizedBox(height: 10),
+          _buildGridRow([
+            _entryCard('菜库', '📖', '/dish', AppColors.primary),
+            _entryCard('记录', '📝', '/dailylog', AppColors.saveGreen),
+          ]),
+          const SizedBox(height: 10),
+          _buildGridRow([
+            _entryCard('新菜', '➕', '/create-dish', AppColors.warnOrange),
+            _entryCard('食材', '🥬', '/create-ingredient', const Color(0xFF8B5E3C)),
+          ]),
+
+          const SizedBox(height: 20),
+
+          _sectionHeader('📦', '库存与采购'),
+          const SizedBox(height: 10),
+          _buildGridRow([
+            _entryCard('库存', '📦', '/pantry', const Color(0xFF5B8C5A)),
+            _entryCard('采购', '🛒', '/shopping', const Color(0xFFD4843A)),
+          ]),
+
+          const SizedBox(height: 20),
+
+          _sectionHeader('🤖', 'AI 帮你'),
+          const SizedBox(height: 10),
+          _buildGridRow([
+            _entryCard('定菜单', '📋', '/ai-recommend', const Color(0xFF7B68EE)),
+            _entryCard('估营养', '🔍', '/ai-estimate', const Color(0xFF3A7BD5)),
+          ]),
+
+          const SizedBox(height: 24),
+
+          Center(
+            child: TextButton.icon(
+              onPressed: () => context.read<AuthStore>().logout(),
+              icon: const Icon(Icons.logout, size: 16),
+              label: const Text('退出登录'),
+              style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ]),
+      ),
+    );
+  }
+
+  Widget _sectionHeader(String emoji, String title) {
+    return Row(children: [
+      Text(emoji, style: const TextStyle(fontSize: 16)),
+      const SizedBox(width: 6),
+      Text(title,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2D2A26))),
+    ]);
+  }
+
+  Widget _buildGridRow(List<Widget> children) {
+    return Row(children: [
+      Expanded(child: children[0]),
+      const SizedBox(width: 10),
+      Expanded(child: children[1]),
+    ]);
+  }
+
+  Widget _buildStatsRow() {
+    return Row(children: [
+      Expanded(child: _statCard('12+', '道菜品', '📖', AppColors.primary)),
+      const SizedBox(width: 8),
+      Expanded(child: _statCard('3', '餐记录', '🍽️', AppColors.saveGreen)),
+      const SizedBox(width: 8),
+      Expanded(child: _statCard('8', '件库存', '📦', AppColors.warnOrange)),
+    ]);
+  }
+
+  Widget _statCard(String value, String label, String emoji, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withAlpha(8), blurRadius: 8, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Column(children: [
+        Text(emoji, style: const TextStyle(fontSize: 22)),
+        const SizedBox(height: 4),
+        Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
+        Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+      ]),
+    );
+  }
+
+  Widget _entryCard(String title, String emoji, String route, Color color) {
+    return GestureDetector(
+      onTap: () => context.push(route),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 6, offset: const Offset(0, 2)),
+          ],
+        ),
+        child: Column(children: [
+          Text(emoji, style: const TextStyle(fontSize: 28)),
+          const SizedBox(height: 8),
+          Text(title,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF2D2A26))),
+        ]),
+      ),
+    );
+  }
 }

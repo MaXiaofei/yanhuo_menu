@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/image_helper.dart';
 import '../../core/theme.dart';
 import '../../models/dish.dart';
 import '../../services/dish_service.dart';
@@ -8,6 +9,8 @@ import '../../widgets/loading_empty.dart';
 
 /// 菜库列表（复刻 menu-mini/src/pages/dish/List.vue）。
 /// 搜索 + 分页（pageSize=20）+ 下拉刷新 + 上拉加载更多。
+///
+/// 封面图片使用缩略图（/thumbnail/xxx.jpg），节省列表滚动时的流量和内存。
 class DishListPage extends StatefulWidget {
   const DishListPage({super.key});
   @override
@@ -135,23 +138,62 @@ class _DishListPageState extends State<DishListPage> {
                                   );
                                 }
                                 final d = _dishes[i];
-                                return ListTile(
-                                  title: Text(d.name),
-                                  subtitle: Text(
-                                    '${d.cookTime ?? 0}分钟 · 难度${d.difficulty ?? '-'}',
-                                    style: const TextStyle(
-                                        color: AppColors.textSecondary,
-                                        fontSize: 13),
-                                  ),
-                                  trailing: const Icon(Icons.chevron_right,
-                                      color: AppColors.textSecondary),
-                                  onTap: () => context.push('/dish/${d.id}'),
-                                );
+                                return _DishTile(dish: d);
                               },
                             ),
                     ),
             ),
           ],
         ),
+      );
+}
+
+/// 列表项：封面缩略图 + 菜名 + 时间/难度。
+class _DishTile extends StatelessWidget {
+  final Dish dish;
+  const _DishTile({required this.dish});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasCover =
+        dish.coverUrl != null && dish.coverUrl!.isNotEmpty;
+    final thumbUrl = hasCover
+        ? ImageHelper.toThumbnail(ImageHelper.toAbsolute(dish.coverUrl!))
+        : null;
+
+    return ListTile(
+      leading: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: SizedBox(
+          width: 56,
+          height: 56,
+          child: thumbUrl != null
+              ? Image.network(
+                  thumbUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _placeholder(),
+                  loadingBuilder: (_, child, progress) {
+                    if (progress == null) return child;
+                    return _placeholder();
+                  },
+                )
+              : _placeholder(),
+        ),
+      ),
+      title: Text(dish.name),
+      subtitle: Text(
+        '${dish.cookTime ?? 0}分钟 · 难度${dish.difficulty ?? '-'}',
+        style: const TextStyle(
+            color: AppColors.textSecondary, fontSize: 13),
+      ),
+      trailing: const Icon(Icons.chevron_right,
+          color: AppColors.textSecondary),
+      onTap: () => context.push('/dish/${dish.id}'),
+    );
+  }
+
+  Widget _placeholder() => Container(
+        color: const Color(0xFFF5F0E8),
+        child: const Icon(Icons.restaurant, color: Color(0xFFCCCCCC), size: 24),
       );
 }

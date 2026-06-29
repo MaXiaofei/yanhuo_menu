@@ -54,4 +54,21 @@ class DishService {
         .map((e) => NutritionMetric.fromJson(e as Map<String, dynamic>))
         .toList();
   }
+
+  /// 录入新菜：POST /dish  → 返回新菜品 id。
+  ///
+  /// [data] 即 DishSaveDTO：{ dish, steps[, cuisineIds, tagIds, ...] }。
+  static Future<int> saveDish(Map<String, dynamic> data) async {
+    final result = await ApiClient.instance.post('/dish', body: data);
+    return (result as num).toInt();
+  }
+
+  /// URL 导入：POST /dish/import-url?url=xxx  → 返回新菜品 id。
+  static Future<int> importDishByUrl(String url) async {
+    final result = await ApiClient.instance.post(
+      '/dish/import-url',
+      query: {'url': url},
+    );
+    return (result as num).toInt();
+  }
 }

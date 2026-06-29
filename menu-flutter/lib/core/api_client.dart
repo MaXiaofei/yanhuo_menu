@@ -5,7 +5,7 @@ import 'api_response.dart';
 /// dio 单例：对应小程序 menu-mini/src/utils/request.ts。
 ///
 /// 关键契约（探索确认，必须遵守）：
-/// - baseURL 无 /api 前缀
+/// - baseURL 带 /gudu 前缀（后端 context-path），测试环境走 http://49.232.3.201:9090/gudu
 /// - 每次请求塞 `Authorization: <裸 token>`（无 Bearer 前缀）
 /// - 统一解包 {code,msg,data}：code==0 返回 data；code==401 清 token+跳登录；其它 toast+抛 ApiError
 class ApiClient {
@@ -23,7 +23,9 @@ class ApiClient {
   /// 业务错误/网络错误提示回调（app 注入 SnackBar）。
   void Function(String message)? onErrorToast;
 
-  void init({this.onUnauthorized, this.onErrorToast}) {
+  void init({void Function()? onUnauthorized, void Function(String)? onErrorToast}) {
+    this.onUnauthorized = onUnauthorized;
+    this.onErrorToast = onErrorToast;
     dio = Dio(BaseOptions(
       baseUrl: AppConstants.baseUrl,
       connectTimeout: const Duration(seconds: 10),

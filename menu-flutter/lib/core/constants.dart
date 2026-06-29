@@ -3,10 +3,11 @@
 class AppConstants {
   AppConstants._();
 
-  /// 后端 baseURL（**不带 /api 前缀**，后端无 context-path）。
+  /// 后端 baseURL（**带 /gudu 前缀**，即后端 context-path）。
+  /// 测试环境走腾讯云 nginx 代理：http://49.232.3.201:9090/gudu
+  /// 生产环境：http://49.232.3.201/gudu
   /// 内测用明文 HTTP；iOS 需在 Info.plist 放开 ATS（NSAllowsArbitraryLoads），见 README。
-  /// 改成你自己的后端地址即可。
-  static const String baseUrl = 'http://192.168.100.248:8080';
+  static const String baseUrl = 'http://49.232.3.201:9090/gudu';
 
   /// SharedPreferences key：登录 token（对应小程序 uni.setStorageSync('token')）。
   static const String tokenKey = 'token';
