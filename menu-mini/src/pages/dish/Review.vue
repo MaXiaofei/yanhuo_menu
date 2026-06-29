@@ -1,30 +1,61 @@
 <template>
-  <view class="review">
-    <view class="block">
-      <text class="label">总评星级</text>
-      <u-rate v-model="form.starRating" :count="5" />
+  <view class="page">
+    <!-- 总评星级：醒目渐变卡 -->
+    <view class="rating-card">
+      <text class="rating-label">给这道菜打个分</text>
+      <u-rate v-model="form.starRating" :count="5" size="30" />
+      <text class="rating-hint">{{ ratingHint }}</text>
     </view>
+
+    <!-- 点评文字 -->
     <view class="block">
-      <text class="label">点评文字</text>
-      <u-textarea v-model="form.text" placeholder="说说味道、难度……" />
-    </view>
-    <view class="block">
-      <text class="label">图片</text>
-      <u-upload :fileList="imgs" @afterRead="onAdd" @delete="onDelete" :maxCount="6" />
-    </view>
-    <view class="block">
-      <text class="label">维度打分</text>
-      <view class="dim" v-for="d in dims" :key="d.id">
-        <text class="dim-name">{{ d.name }}</text>
-        <u-rate v-model="scores[d.id]" :count="5" />
+      <view class="block-title">
+        <view class="tbar"></view>
+        <text>说点啥</text>
+      </view>
+      <view class="yh-card">
+        <u-textarea v-model="form.text" placeholder="味道如何？难不难？想再做一次吗？" border="none" :auto-height="true" />
       </view>
     </view>
-    <u-button type="primary" :loading="loading" @click="onSubmit">提交</u-button>
+
+    <!-- 图片 -->
+    <view class="block">
+      <view class="block-title">
+        <view class="tbar"></view>
+        <text>传点图</text>
+      </view>
+      <view class="yh-card">
+        <u-upload :fileList="imgs" @afterRead="onAdd" @delete="onDelete" :maxCount="6" />
+      </view>
+    </view>
+
+    <!-- 维度打分 -->
+    <view class="block" v-if="dims.length">
+      <view class="block-title">
+        <view class="tbar"></view>
+        <text>分项打分</text>
+      </view>
+      <view class="yh-card dim-card">
+        <view class="dim-row" v-for="(d, i) in dims" :key="d.id">
+          <text class="dim-name">{{ d.name }}</text>
+          <u-rate v-model="scores[d.id]" :count="5" />
+        </view>
+      </view>
+    </view>
+
+    <view style="height: 160rpx;"></view>
+
+    <!-- 底部提交 -->
+    <view class="bottom-actions">
+      <button class="yh-btn-gradient" :disabled="loading" @click="onSubmit">
+        {{ loading ? '提交中…' : '提交点评' }}
+      </button>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { submitReview, dimensions, uploadImages } from '@/api/review'
 
@@ -35,9 +66,25 @@ const form = reactive({ starRating: 5, text: '' })
 const scores = reactive<Record<number, number>>({})
 const loading = ref(false)
 
+// 按星级给一句反馈文案，增强打分时的反馈感
+const ratingHint = computed(() => {
+  const map: Record<number, string> = {
+    1: '不太行',
+    2: '一般般',
+    3: '还可以',
+    4: '挺不错',
+    5: '想天天吃！',
+  }
+  return map[form.starRating] || ''
+})
+
 onLoad(async (q: any) => {
   dishId.value = q.dishId
-  try { dims.value = await dimensions() } catch {}
+  try {
+    dims.value = await dimensions()
+    // 维度分默认跟总评一致，避免用户不逐项打分就提交全 0
+    dims.value.forEach((d: any) => { scores[d.id] = form.starRating })
+  } catch {}
 })
 
 function onAdd(e: any) {
@@ -74,9 +121,84 @@ async function onSubmit() {
 </script>
 
 <style scoped>
-.review { padding: 30rpx; }
-.block { margin-bottom: 30rpx; }
-.label { display: block; font-size: 28rpx; color: #666; margin-bottom: 16rpx; }
-.dim { display: flex; justify-content: space-between; align-items: center; padding: 12rpx 0; }
-.dim-name { font-size: 28rpx; }
+.page {
+  min-height: 100vh;
+  background: #FFFBF5;
+  padding: 0 28rpx calc(env(safe-area-inset-bottom) + 40rpx);
+}
+
+/* 总评星级：醒目渐变卡 */
+.rating-card {
+  margin-top: calc(env(safe-area-inset-top) + 24rpx);
+  background: linear-gradient(180deg, #FF8C42, #E6762A);
+  border-radius: 36rpx;
+  padding: 48rpx 40rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20rpx;
+  box-shadow: 0 8rpx 24rpx rgba(255, 140, 66, 0.25);
+}
+.rating-label {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #FFFFFF;
+}
+.rating-hint {
+  font-size: 26rpx;
+  color: rgba(255, 255, 255, 0.92);
+  min-height: 34rpx;
+}
+
+/* 块标题（复用详情页 block-title 视觉） */
+.block { margin-top: 36rpx; }
+.block-title {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 18rpx;
+}
+.tbar {
+  width: 8rpx;
+  height: 32rpx;
+  background: #FF8C42;
+  border-radius: 4rpx;
+}
+.block-title text {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #2D2A26;
+}
+
+/* 维度分项卡 */
+.dim-card { padding: 8rpx 32rpx; }
+.dim-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 0;
+  border-bottom: 2rpx solid #F2EDE4;
+}
+.dim-row:last-child { border-bottom: none; }
+.dim-name {
+  font-size: 28rpx;
+  color: #2D2A26;
+}
+
+/* 底部固定提交栏 */
+.bottom-actions {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 24rpx 28rpx calc(env(safe-area-inset-bottom) + 24rpx);
+  background: #FFFFFF;
+  box-shadow: 0 -4rpx 16rpx rgba(0, 0, 0, 0.06);
+  z-index: 10;
+}
+.bottom-actions .yh-btn-gradient {
+  height: 88rpx;
+  line-height: 88rpx;
+  font-size: 30rpx;
+}
 </style>

@@ -1,8 +1,8 @@
 # 咕嘟小食单 · 开发依赖（MySQL / Redis / MinIO）—— 独立开发库方案（当前未启用）
 # ⚠️ 状态：此 compose 定义的 yanhuo-deps 已于 2026-06-27 删除（容器+数据）。
 #    当前本地开发改连测试环境 gudu-deploy 的 MySQL/Redis（见 application-dev.yml）：
-#      mysql  192.168.100.248:3306  (root,密码见 .env, 库 gudu)
-#      redis  192.168.100.248:6379
+#      mysql  49.232.3.201:3306 (生产) / 49.232.3.201:13306 (测试/staging)
+#      redis  49.232.3.201:6379 (生产) / 49.232.3.201:16379 (测试/staging)
 #    如需重建独立开发库（不污染测试数据），在有 docker 的机器上跑此 compose 即可。
 services:
   yanhuo-mysql:

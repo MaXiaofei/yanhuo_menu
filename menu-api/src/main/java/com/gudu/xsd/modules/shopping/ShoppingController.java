@@ -30,22 +30,27 @@ public class ShoppingController {
     /** 生成请求体：sourceType + sourceId(menu/plan) 或 sourceIds(dish 多选)。 */
     @Data
     public static class GenerateReq {
-        /** 数据源：menu / dish / plan。 */
+        /** 数据源：menu / dish / plan / custom。 */
         private String sourceType;
         /** menu 或 plan 的 id（sourceType=menu/plan 时用）。 */
         private Long sourceId;
         /** dish 多选 id 列表（sourceType=dish 时用）。 */
         private List<Long> sourceIds;
+        /** 自定义文本（sourceType=custom 时用）。 */
+        private String customText;
     }
 
     /**
-     * 从菜单/菜品/周计划生成采购草稿（按 ingredient_id 去重，referenceGrams = 菜谱克数合计）。
+     * 从菜单/菜品/周计划/自定义文本生成采购草稿。
      * 返回新生成的 shopping_list.id。
      */
     @PostMapping("/generate")
     @MpPerm("shopping.generate")
     public R<Long> generate(@RequestBody GenerateReq req) {
         String type = req.getSourceType() == null ? "plan" : req.getSourceType();
+        if ("custom".equals(type)) {
+            return R.ok(svc.generateFromText(req.getCustomText()));
+        }
         return R.ok(svc.generate(type, req.getSourceId(), req.getSourceIds()));
     }
 

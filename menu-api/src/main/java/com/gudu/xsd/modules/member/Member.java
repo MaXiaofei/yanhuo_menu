@@ -47,6 +47,12 @@ public class Member {
     @TableField(typeHandler = JacksonTypeHandler.class)
     private Map<String, Object> healthProfile;
 
+    /** 体控目标：MAINTAIN(维持) / LOSE(减脂) / GAIN(增肌)。null 为未设定。 */
+    private String goal;
+
+    /** 活动水平：SEDENTARY / LIGHT / MODERATE / ACTIVE。null 为未设定。 */
+    private String activityLevel;
+
     /**
      * 小程序功能权限 key 数组(JSON)。如 ["dish.create","menu.plan"]。
      * null 时走角色默认模板;非空时与角色默认取并集(个人勾选只能增不能减)。

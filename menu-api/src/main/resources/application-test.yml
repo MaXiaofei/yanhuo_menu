@@ -3,13 +3,14 @@
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://192.168.100.248:3306/yanhuo_test?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8&allowPublicKeyRetrieval=true
+    # E2E 测试连腾讯云测试库（staging 对外端口 13306）
+    url: jdbc:mysql://49.232.3.201:13306/yanhuo_test?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8&allowPublicKeyRetrieval=true
     username: root
     password: ${MYSQL_ROOT_PASSWORD:}
   data:
     redis:
-      host: 192.168.100.248
-      port: 6379
+      host: 49.232.3.201
+      port: 16379
   task:
     scheduling:
       pool:

@@ -1,0 +1,91 @@
+# 咕嘟小食单 · 测试环境（与生产同机隔离部署，HTTP）
+# ============================================================
+# 部署在 49.232.3.201:/root/gudu-staging/，与生产 /root/gudu/ 物理隔离。
+#
+# 与生产的隔离维度（四维全隔离，互不影响）：
+#   - project name: gudu-staging（生产为 gudu-deploy，默认目录名）
+#   - Docker 网络: gudu-staging_net（显式命名，生产为 gudu-deploy_default）
+#   - 容器名: 全部 -staging 后缀（生产为 -prod 后缀）
+#   - 宿主端口: 9090/13306/16379（生产为 80/443/3306/6379，全部错开）
+#   - 数据卷: gudu-staging_mysql-data（project 前缀天然隔离，生产为 gudu-deploy_mysql-data）
+#
+# ⭐ 关键技巧：menu-api 通过 service name（gudu-mysql/gudu-redis）连库，
+#    而 service name 解析依赖所在 Docker 网络。staging-net 与生产的 default 网络
+#    是隔离的命名空间，故两套环境的 db 互不可达——同一份 menu-api 镜像、同一份
+#    application-prod.yml 可零改动跑两套，各自连各自网络的 db。
+#
+# 部署：
+#   docker compose -p gudu-staging -f docker-compose.staging.yml up -d --build
+# 首启会自动执行 ./menu-api/sql/V01~V30 初始化全新空库（与生产数据完全隔离）。
+# ============================================================
+services:
+  gudu-mysql:
+    image: mysql:8.0
+    container_name: gudu-mysql-staging
+    restart: unless-stopped
+    networks: [staging-net]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${STAGING_MYSQL_ROOT_PASSWORD:-${MYSQL_ROOT_PASSWORD}}
+      MYSQL_DATABASE: gudu
+      TZ: Asia/Shanghai
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci", "--character-set-client-handshake=FALSE"]
+    ports:
+      - "13306:3306"   # 错开生产的 3306
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./menu-api/sql:/docker-entrypoint-initdb.d:ro
+
+  gudu-redis:
+    image: redis:7
+    container_name: gudu-redis-staging
+    restart: unless-stopped
+    networks: [staging-net]
+    ports:
+      - "16379:6379"   # 错开生产的 6379
+
+  menu-api:
+    build: ./menu-api
+    container_name: menu-api-staging
+    restart: unless-stopped
+    networks: [staging-net]
+    depends_on: [gudu-mysql, gudu-redis]
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      TZ: Asia/Shanghai
+      DEEPSEEK_API_KEY: ${STAGING_DEEPSEEK_API_KEY:-${DEEPSEEK_API_KEY:-}}
+      GLM_API_KEY: ${STAGING_GLM_API_KEY:-${GLM_API_KEY:-}}
+      GUDU_AI_PROVIDER: ${STAGING_AI_PROVIDER:-mock}   # 测试默认 mock，不烧 key
+      MYSQL_ROOT_PASSWORD: ${STAGING_MYSQL_ROOT_PASSWORD:-${MYSQL_ROOT_PASSWORD}}
+      # 上传目录覆写：与生产 /app/uploads/prod 隔离
+      SPRING_APPLICATION_JSON: '{"gudu":{"upload-dir":"/app/uploads/staging"}}'
+    volumes:
+      - uploads:/app/uploads
+      - ./logs:/app/logs
+
+  menu-admin:
+    build: ./menu-admin
+    container_name: menu-admin-staging
+    restart: unless-stopped
+    networks: [staging-net]
+    ports:
+      - "9090:80"   # 测试后台入口：http://49.232.3.201:9090
+    depends_on:
+      - menu-api
+
+  menu-mini:
+    build: ./menu-mini
+    container_name: menu-mini-staging
+    restart: unless-stopped
+    networks: [staging-net]
+    ports:
+      - "9091:80"   # 测试小程序 H5 入口：http://49.232.3.201:9091
+    depends_on:
+      - menu-api
+
+networks:
+  staging-net:
+    name: gudu-staging_net   # 显式命名，确保与生产 default 网络隔离
+
+volumes:
+  mysql-data:
+  uploads:

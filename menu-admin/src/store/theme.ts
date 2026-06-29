@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { themes, getTheme, type Theme } from '@/styles/themes'
 
-const THEME_KEY = 'yanhuo-theme'
+const THEME_KEY = 'gudu-theme'
 
 export const useThemeStore = defineStore('theme', () => {
   const current = ref<string>(localStorage.getItem(THEME_KEY) || 'warm')

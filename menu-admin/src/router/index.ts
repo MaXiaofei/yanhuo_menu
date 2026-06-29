@@ -73,6 +73,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/backup/Index.vue'),
         meta: { title: '数据备份' },
       },
+      {
+        path: 'ai-log',
+        name: 'AiLog',
+        component: () => import('@/views/ai-log/Index.vue'),
+        meta: { title: 'AI 用量' },
+      },
     ],
   },
 ]
@@ -83,7 +89,7 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
-  const token = localStorage.getItem('yanhuo-token')
+  const token = localStorage.getItem('gudu-token')
   if (!token && !to.meta.public && to.path !== '/login') {
     return { path: '/login' }
   }

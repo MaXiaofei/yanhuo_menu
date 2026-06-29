@@ -1,10 +1,10 @@
 import axios, { type AxiosRequestConfig } from 'axios'
 import { ElMessage } from 'element-plus'
 
-const TOKEN_KEY = 'yanhuo-token'
+const TOKEN_KEY = 'gudu-token'
 
 const instance = axios.create({
-  baseURL: '/api',
+  baseURL: '/gudu',
   timeout: 15000,
 })
 

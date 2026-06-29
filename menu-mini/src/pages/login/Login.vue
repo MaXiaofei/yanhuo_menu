@@ -64,7 +64,7 @@ async function onLogin() {
   loading.value = true
   try {
     await auth.login(form.username, form.password)
-    uni.switchTab({ url: '/pages/dish/List' })
+    uni.switchTab({ url: '/pages/index/Index' })
   } catch {
     // request.ts 已弹 toast
   } finally {

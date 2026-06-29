@@ -2,21 +2,32 @@ package com.gudu.xsd.modules.file;
 
 import com.gudu.xsd.common.R;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import net.coobird.thumbnailator.Thumbnails;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.nio.file.Files;
+import java.util.List;
 import java.util.Map;
 
 /**
- * 文件上传（MVP 本地存储；MinIO 接入留 V1）。
+ * 文件上传：原图 + 缩略图（400px 宽）。
+ *
+ * 目录结构（uploadDir 由 gudu.upload-dir 配置，各环境独立）：
+ *   {uploadDir}/
+ *     original/   ← 原图
+ *     thumbnail/  ← 缩略图（400px 宽，保持比例）
+ *
+ * 响应格式：{ url（原图）, thumbnailUrl（缩略图）, name（原始文件名）}。
  */
 @RestController
 @RequestMapping("/file")
 @Tag(name = "文件")
 public class FileController {
+
+    private static final int THUMBNAIL_WIDTH = 400;
 
     @Value("${gudu.upload-dir:uploads}")
     private String uploadDir;
@@ -24,14 +35,42 @@ public class FileController {
     @PostMapping("/upload")
     public R<Map<String, String>> upload(@RequestParam("file") MultipartFile file) throws Exception {
         String original = (file.getOriginalFilename() == null) ? "file" : file.getOriginalFilename();
-        String ext = original.contains(".") ? original.substring(original.lastIndexOf(".")) : "";
-        String name = System.currentTimeMillis() + ext;
-        File dest = new File(uploadDir, name).getAbsoluteFile();
-        File parent = dest.getParentFile();
-        if (!parent.exists() && !parent.mkdirs()) {
-            throw new IllegalStateException("无法创建上传目录: " + parent.getAbsolutePath());
+        String ext = original.contains(".") ? original.substring(original.lastIndexOf(".")).toLowerCase() : ".jpg";
+        // 安全收窄扩展名
+        if (!List.of(".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp").contains(ext)) {
+            ext = ".jpg";
         }
-        Files.copy(file.getInputStream(), dest.toPath());
-        return R.ok(Map.of("url", "/uploads/" + name, "name", original));
+        String baseName = System.currentTimeMillis() + ext;
+
+        File originalDir = new File(uploadDir, "original").getAbsoluteFile();
+        File thumbnailDir = new File(uploadDir, "thumbnail").getAbsoluteFile();
+        ensureDir(originalDir);
+        ensureDir(thumbnailDir);
+
+        // 1. 存原图
+        File originalFile = new File(originalDir, baseName);
+        Files.copy(file.getInputStream(), originalFile.toPath());
+
+        // 2. 生成缩略图（400px 宽，等比缩放）
+        File thumbnailFile = new File(thumbnailDir, baseName);
+        Thumbnails.of(originalFile)
+                .width(THUMBNAIL_WIDTH)
+                .keepAspectRatio(true)
+                .outputQuality(0.85)
+                .toFile(thumbnailFile);
+
+        // 带 context-path /gudu 前缀，前端 <img src> 直接可用
+        String prefix = "/gudu/uploads/";
+        return R.ok(Map.of(
+                "url", prefix + "original/" + baseName,
+                "thumbnailUrl", prefix + "thumbnail/" + baseName,
+                "name", original
+        ));
+    }
+
+    private void ensureDir(File dir) {
+        if (!dir.exists() && !dir.mkdirs()) {
+            throw new IllegalStateException("无法创建上传目录: " + dir.getAbsolutePath());
+        }
     }
 }

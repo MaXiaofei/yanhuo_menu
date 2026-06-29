@@ -32,8 +32,11 @@ import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
@@ -69,6 +72,9 @@ class AiControllerTest {
 
     @MockBean
     private AiService svc;
+
+    @MockBean
+    private AiClientRouter router;
 
     private final ObjectMapper om = new ObjectMapper();
 
@@ -121,6 +127,47 @@ class AiControllerTest {
                 .andExpect(jsonPath("$.data.description").value("一盘番茄炒蛋"))
                 .andExpect(jsonPath("$.data.nutrition['1']").value(350))
                 .andExpect(jsonPath("$.data.aiNote").value("按家常份量估算"));
+    }
+
+    // ---------------- provider 运行时切换 ----------------
+
+    @Test
+    void 查询provider_返回当前值与各ready状态() throws Exception {
+        given(router.currentProvider()).willReturn("glm");
+        given(router.providerReady("deepseek")).willReturn(true);
+        given(router.providerReady("glm")).willReturn(true);
+        given(router.providerReady("mock")).willReturn(true);
+
+        mvc.perform(get("/ai/provider"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.current").value("glm"))
+                .andExpect(jsonPath("$.data.providers[0]").value("deepseek"))
+                .andExpect(jsonPath("$.data.ready[0].provider").value("deepseek"))
+                .andExpect(jsonPath("$.data.ready[0].ready").value(true));
+    }
+
+    @Test
+    void 切换provider_合法值_返回新值() throws Exception {
+        given(router.switchProvider(eq("glm"))).willReturn("glm");
+
+        mvc.perform(put("/ai/provider")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"provider\":\"glm\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data").value("glm"));
+    }
+
+    @Test
+    void 切换provider_非法值_返回fail() throws Exception {
+        given(router.switchProvider(eq("claude")))
+                .willThrow(new com.gudu.xsd.common.BizException("非法 provider：claude"));
+
+        mvc.perform(put("/ai/provider")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"provider\":\"claude\"}"))
+                .andExpect(jsonPath("$.code").value(1));
     }
 
     private static IngredientNutrition nut(Long metricId, String val) {

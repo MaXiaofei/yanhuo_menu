@@ -8,6 +8,7 @@ import com.gudu.xsd.modules.ai.dto.DishEstimateRequest;
 import com.gudu.xsd.modules.ai.dto.DishEstimateResponse;
 import com.gudu.xsd.modules.ai.dto.MenuCandidate;
 import com.gudu.xsd.modules.ai.dto.MenuRecommendRequest;
+import com.gudu.xsd.modules.ai.dto.MenuRecommendResponse;
 import com.gudu.xsd.modules.ai.dto.NutritionFillRequest;
 import com.gudu.xsd.modules.ai.dto.NutritionFillResponse;
 import com.gudu.xsd.modules.ai.mapper.AiCallLogMapper;
@@ -32,8 +33,10 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -63,6 +66,7 @@ public class AiService {
     private final AiCallLogMapper aiCallLogMapper;
     private final ObjectMapper objectMapper;
     private final AiInputGuard inputGuard;
+    private final MenuRecommender menuRecommender;
 
     /** 每 member 每日 AI 调用上限（配置 yanhuo.ai.daily-limit，默认 50）。null/无 member 不限。 */
     @Value("${gudu.ai.daily-limit:50}")
@@ -84,7 +88,7 @@ public class AiService {
         String reqJson = safeJson(reqMap);
         try {
             NutritionFillResponse resp = aiClient.fillNutrition(req);
-            // 落库：ingredientId 非空时，整体替换该食材的营养 EAV（食材本身已存在，只更新营养，不重 save 防主键冲突）
+            // 落库
             if (req.ingredientId() != null) {
                 Ingredient ing = ingredientService.getById(req.ingredientId());
                 if (ing != null) {
@@ -92,7 +96,7 @@ public class AiService {
                 }
             }
             logCall("nutrition_fill", memberId, reqJson, safeJson(resp),
-                    0, 0, BigDecimal.ZERO, aiClient.provider(), "ok", null, start);
+                    resp.tokensIn(), resp.tokensOut(), BigDecimal.ZERO, aiClient.provider(), "ok", null, start);
             return resp;
         } catch (BizException e) {
             logCall("nutrition_fill", memberId, reqJson, null,
@@ -123,11 +127,6 @@ public class AiService {
                     allergies = parseAllergies(m.getHealthProfile());
                 }
             }
-            Map<String, Object> healthConstraints = new HashMap<>();
-            if (cons.sugarMax() != null) healthConstraints.put("sugarMax", cons.sugarMax());
-            if (cons.calMax() != null) healthConstraints.put("calMax", cons.calMax());
-            if (!allergies.isEmpty()) healthConstraints.put("allergies", allergies);
-
             // 2. 候选池：DishService.search
             DishSearchDTO q = new DishSearchDTO();
             q.setPageNum(1);
@@ -150,17 +149,57 @@ public class AiService {
                 candidates.add(new CandidateDish(d.getId(), d.getName(), price, nut, ingNames));
             }
 
-            // 4. 回填候选上下文 + 健康约束进 req，交给 AiClient（DeepSeek 从候选选+组合+理由，失败降级 MenuRecommender）
+            // 4. 规则引擎先跑：过滤/打分/组合，取 Top 5 结果里的菜品作为 LLM 候选
+            Map<String, Object> hc = new HashMap<>();
+            if (cons.sugarMax() != null) hc.put("sugarMax", cons.sugarMax());
+            if (cons.calMax() != null) hc.put("calMax", cons.calMax());
+            if (!allergies.isEmpty()) hc.put("allergies", allergies);
+
+            // 组装成 MenuRecommender 候选
+            List<MenuRecommender.CandidateDish> rcList = new ArrayList<>();
+            for (CandidateDish cd : candidates) {
+                rcList.add(new MenuRecommender.CandidateDish(
+                        cd.dishId(), cd.name(), cd.price(), cd.nutrition(), cd.ingredientNames()));
+            }
+            long seed = req.memberId() == null ? 42L : req.memberId();
+            List<MenuCandidate> ruleResult = menuRecommender.recommend(
+                    rcList, cons, allergies, req.budget(),
+                    req.scope() == null ? "DAY" : req.scope(), seed);
+
+            // 从规则结果中提取唯一菜品，去重后取 top 5
+            Set<Long> ruleDishIds = new LinkedHashSet<>();
+            for (MenuCandidate mc : ruleResult) {
+                for (MenuCandidate.DishItem di : mc.dishes()) {
+                    ruleDishIds.add(di.dishId());
+                    if (ruleDishIds.size() >= 5) break;
+                }
+                if (ruleDishIds.size() >= 5) break;
+            }
+
+            // 过滤出这 5 个候选
+            List<CandidateDish> top5 = new ArrayList<>();
+            Map<Long, CandidateDish> byId = candidates.stream()
+                    .collect(Collectors.toMap(CandidateDish::dishId, c -> c, (a, b) -> a));
+            for (Long id : ruleDishIds) {
+                CandidateDish c = byId.get(id);
+                if (c != null) top5.add(c);
+            }
+            // 如果规则没选出足够的菜（候选池太小），回退用原始前 5 个
+            if (top5.size() < 3) {
+                top5 = candidates.stream().limit(5).collect(Collectors.toList());
+            }
+
+            // 5. LLM 从规则预选的 Top 5 中做最终选择 + 生成理由
             MenuRecommendRequest enriched = new MenuRecommendRequest(
                     req.memberId(), req.budget(), req.scope(),
                     req.cuisineIds(), req.tagIds(), req.categoryIds(),
                     req.maxMinutes(), req.maxDifficulty(),
-                    candidates, healthConstraints);
-            List<MenuCandidate> groups = aiClient.recommendMenu(enriched);
+                    top5, hc);
+            MenuRecommendResponse mr = aiClient.recommendMenu(enriched);
 
-            logCall("menu_recommend", req.memberId(), reqJson, safeJson(groups),
-                    0, 0, BigDecimal.ZERO, aiClient.provider(), "ok", null, start);
-            return groups;
+            logCall("menu_recommend", req.memberId(), reqJson, safeJson(mr.groups()),
+                    mr.tokensIn(), mr.tokensOut(), BigDecimal.ZERO, aiClient.provider(), "ok", null, start);
+            return mr.groups();
         } catch (BizException e) {
             logCall("menu_recommend", req.memberId(), reqJson, null,
                     0, 0, BigDecimal.ZERO, aiClient.provider(), "fail", e.getMessage(), start);
@@ -183,7 +222,7 @@ public class AiService {
         try {
             DishEstimateResponse resp = aiClient.estimateDish(req);
             logCall("dish_estimate", memberId, reqJson, safeJson(resp),
-                    0, 0, BigDecimal.ZERO, aiClient.provider(), "ok", null, start);
+                    resp.tokensIn(), resp.tokensOut(), BigDecimal.ZERO, aiClient.provider(), "ok", null, start);
             return resp;
         } catch (BizException e) {
             logCall("dish_estimate", memberId, reqJson, null,

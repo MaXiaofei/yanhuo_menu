@@ -17,5 +17,11 @@ import java.util.Map;
 public record DishEstimateResponse(String description,
                                    Map<Long, BigDecimal> nutrition,
                                    String source,
-                                   String aiNote) {
+                                   String aiNote,
+                                   int tokensIn,
+                                   int tokensOut) {
+    public DishEstimateResponse(String description, Map<Long, BigDecimal> nutrition,
+                                String source, String aiNote) {
+        this(description, nutrition, source, aiNote, 0, 0);
+    }
 }

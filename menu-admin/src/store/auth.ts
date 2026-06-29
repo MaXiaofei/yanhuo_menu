@@ -2,8 +2,8 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { login as apiLogin, logout as apiLogout, me as apiMe, type LoginDTO } from '@/api/auth'
 
-const TOKEN_KEY = 'yanhuo-token'
-const NICKNAME_KEY = 'yanhuo-nickname'
+const TOKEN_KEY = 'gudu-token'
+const NICKNAME_KEY = 'gudu-nickname'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string>(localStorage.getItem(TOKEN_KEY) || '')

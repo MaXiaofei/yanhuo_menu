@@ -8,6 +8,7 @@ import com.gudu.xsd.modules.ai.dto.DishEstimateRequest;
 import com.gudu.xsd.modules.ai.dto.DishEstimateResponse;
 import com.gudu.xsd.modules.ai.dto.MenuCandidate;
 import com.gudu.xsd.modules.ai.dto.MenuRecommendRequest;
+import com.gudu.xsd.modules.ai.dto.MenuRecommendResponse;
 import com.gudu.xsd.modules.ai.dto.NutritionFillRequest;
 import com.gudu.xsd.modules.ai.dto.NutritionFillResponse;
 import com.gudu.xsd.modules.nutrition.IngredientNutrition;
@@ -20,15 +21,15 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Mock AI 客户端：规则表兜底实现。
+ * Mock AI 客户端：规则表兜底实现，常驻 {@code @Component}。
  *
- * <p>始终装配：作为默认 AiClient（provider=mock 时）+ DeepSeekAiClient 失败时的 fallback bean。
- * 默认 provider 由配置决定（application.yml 的 {@code yanhuo.ai.provider}），DeepSeekAiClient 标
- * {@code @Primary}，provider=deepseek 时 AiService 注入 DeepSeekAiClient，本类仍作为降级依赖可用。
+ * <p>职责：①作为 {@code provider=mock} 时 {@code AiClientRouter} 选中的 client；②作为
+ * {@code DeepSeekAiClient}/{@code GlmAiClient}（共用 {@code OpenAiCompatibleClient} 基类）
+ * key 未配/网络失败/解析失败时的降级 fallback。不走 HTTP，逻辑独立，不进基类。
  *
  * <p>营养补全：先查关键词精确表（参考中国食物成分表 per100g），未命中走分类兜底（按名字含「肉/蛋/奶/菜/米/油」匹配模板），
- * 全无匹配抛 {@link BizException}。菜单推荐：仅占位，真正编排由 AiService 调 MenuRecommender 完成；
- * AiClient 层只负责「外部 AI 能力」，mock 下推荐返回空（实际推荐逻辑是确定性算法，走 AiService 内的 MenuRecommender）。
+ * 全无匹配抛 {@link BizException}。菜单推荐：用规则 {@link MenuRecommender} 在候选池上过滤/打分/组合
+ * （候选由 AiService 回填进 req.candidates）。菜品估算：从描述提关键词按经验份量累加。
  */
 @Component
 public class MockAiClient implements AiClient {
@@ -83,11 +84,11 @@ public class MockAiClient implements AiClient {
     }
 
     @Override
-    public List<MenuCandidate> recommendMenu(MenuRecommendRequest req) {
+    public MenuRecommendResponse recommendMenu(MenuRecommendRequest req) {
         // provider=mock 时：用规则 MenuRecommender 在 req.candidates（AiService 已回填）上过滤/打分/组合。
         // 候选为空（异常调用）直接返回空。
         if (req.candidates() == null || req.candidates().isEmpty()) {
-            return List.of();
+            return new MenuRecommendResponse(List.of());
         }
         List<MenuRecommender.CandidateDish> list = new ArrayList<>();
         for (CandidateDish c : req.candidates()) {
@@ -102,8 +103,8 @@ public class MockAiClient implements AiClient {
         List<String> allergies = hc.get("allergies") instanceof List<?> al
                 ? al.stream().map(String::valueOf).toList() : List.of();
         long seed = req.memberId() == null ? 42L : req.memberId();
-        return menuRecommender.recommend(list, cons, allergies, req.budget(),
-                req.scope() == null ? "DAY" : req.scope(), seed);
+        return new MenuRecommendResponse(menuRecommender.recommend(list, cons, allergies, req.budget(),
+                req.scope() == null ? "DAY" : req.scope(), seed));
     }
 
     private static BigDecimal toBd(Object o) {

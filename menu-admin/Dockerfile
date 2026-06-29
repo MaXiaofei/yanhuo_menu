@@ -1,4 +1,4 @@
-# 前端：Node 构建 → Nginx 托管，反代 /api 到后端
+# 前端：Node 构建 → Nginx 托管，反代 /gudu 到后端
 FROM node:20-alpine AS build
 WORKDIR /build
 COPY package.json package-lock.json* ./

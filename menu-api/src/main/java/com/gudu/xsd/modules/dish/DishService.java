@@ -8,8 +8,10 @@ import com.gudu.xsd.modules.dish.mapper.DishDictMapper;
 import com.gudu.xsd.modules.dish.mapper.DishIngredientMapper;
 import com.gudu.xsd.modules.dish.mapper.DishMapper;
 import com.gudu.xsd.modules.dish.mapper.DishStepMapper;
+import com.gudu.xsd.modules.nutrition.Ingredient;
 import com.gudu.xsd.modules.nutrition.IngredientNutrition;
 import com.gudu.xsd.modules.nutrition.NutritionCalcService;
+import com.gudu.xsd.modules.nutrition.mapper.IngredientMapper;
 import com.gudu.xsd.modules.nutrition.mapper.IngredientNutritionMapper;
 import com.gudu.xsd.modules.dict.SysDict;
 import com.gudu.xsd.modules.dict.mapper.DictMapper;
@@ -32,6 +34,7 @@ public class DishService extends ServiceImpl<DishMapper, Dish> {
     private final DishDictMapper dictRelMapper;
     private final DishIngredientMapper dishIngMapper;
     private final IngredientNutritionMapper ingredientNutritionMapper;
+    private final IngredientMapper ingredientMapper;
     private final NutritionCalcService nutritionCalc;
     private final DictMapper dictMapper;
 
@@ -88,6 +91,21 @@ public class DishService extends ServiceImpl<DishMapper, Dish> {
         List<DishDict> rels = dictRelMapper.selectList(new QueryWrapper<DishDict>().eq("dish_id", id));
         List<DishIngredient> ingredients = dishIngMapper.selectList(
                 new QueryWrapper<DishIngredient>().eq("dish_id", id));
+
+        // 批量回填食材名（一次查 ingredient 表，避免前端逐个查名字的 N+1）。
+        if (!ingredients.isEmpty()) {
+            Set<Long> ingIds = ingredients.stream()
+                    .map(DishIngredient::getIngredientId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            if (!ingIds.isEmpty()) {
+                Map<Long, String> nameMap = ingredientMapper.selectBatchIds(ingIds).stream()
+                        .collect(Collectors.toMap(Ingredient::getId, Ingredient::getName));
+                for (DishIngredient di : ingredients) {
+                    di.setIngredientName(nameMap.get(di.getIngredientId()));
+                }
+            }
+        }
 
         List<Long> cuisineIds = new ArrayList<>();
         List<Long> tagIds = new ArrayList<>();

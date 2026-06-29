@@ -1,6 +1,7 @@
 package com.gudu.xsd.modules.dish;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -23,4 +24,8 @@ public class DishIngredient {
 
     /** 用量克数。 */
     private BigDecimal amount;
+
+    /** 食材名（非持久化，详情接口批量回填，避免前端 N+1 查名字）。 */
+    @TableField(exist = false)
+    private String ingredientName;
 }

@@ -1,17 +1,20 @@
 package com.gudu.xsd.modules.dish;
 
+import com.gudu.xsd.common.BizException;
 import com.gudu.xsd.common.R;
 import com.gudu.xsd.modules.dish.DishService.DishDetail;
 import com.gudu.xsd.modules.member.MpPerm;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/dish")
 @RequiredArgsConstructor
@@ -79,9 +82,16 @@ public class DishController {
     @PostMapping("/import-url")
     @MpPerm("dish.create")
     public R<Long> importUrl(@RequestParam String url) {
-        DishSaveDTO dto = recipeImporter.importFromUrl(url);
-        svc.saveFull(dto);
-        return R.ok(dto.getDish().getId());
+        try {
+            DishSaveDTO dto = recipeImporter.importFromUrl(url);
+            svc.saveFull(dto);
+            return R.ok(dto.getDish().getId());
+        } catch (BizException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("import-url 失败 url={} err={}", url, e.toString());
+            throw new BizException("导入失败，请检查链接是否正确或稍后重试");
+        }
     }
 
     /** 更新：先存历史快照，再保存（Controller 编排，避开 Service 循环依赖）。 */

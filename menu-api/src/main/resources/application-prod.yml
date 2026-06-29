@@ -12,13 +12,17 @@ spring:
       port: 6379
 
 gudu:
-  upload-dir: /app/uploads
+  upload-dir: /app/uploads/prod
   ai:
-    provider: ${YANHUO_AI_PROVIDER:deepseek}
+    provider: ${GUDU_AI_PROVIDER:deepseek}
     deepseek:
       base-url: https://api.deepseek.com/v1
       model: deepseek-chat
-      key: ${API_KEY:}
+      key: ${DEEPSEEK_API_KEY:${API_KEY:}}   # 兼容：优先 DEEPSEEK_API_KEY，回退 API_KEY
+    glm:
+      base-url: https://open.bigmodel.cn/api/paas/v4
+      model: glm-4-plus
+      key: ${GLM_API_KEY:}
 
 # 日志：同时输出到控制台(docker logs) + 文件(/app/logs/)
 logging:

@@ -5,8 +5,10 @@ import com.gudu.xsd.modules.dish.mapper.DishDictMapper;
 import com.gudu.xsd.modules.dish.mapper.DishIngredientMapper;
 import com.gudu.xsd.modules.dish.mapper.DishMapper;
 import com.gudu.xsd.modules.dish.mapper.DishStepMapper;
+import com.gudu.xsd.modules.nutrition.Ingredient;
 import com.gudu.xsd.modules.nutrition.IngredientNutrition;
 import com.gudu.xsd.modules.nutrition.NutritionCalcService;
+import com.gudu.xsd.modules.nutrition.mapper.IngredientMapper;
 import com.gudu.xsd.modules.nutrition.mapper.IngredientNutritionMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,6 +36,7 @@ class DishServiceTest {
     private DishDictMapper dictRelMapper;
     private DishIngredientMapper dishIngMapper;
     private IngredientNutritionMapper ingredientNutritionMapper;
+    private IngredientMapper ingredientMapper;
     private DishService svc;
 
     @BeforeEach
@@ -43,7 +46,8 @@ class DishServiceTest {
         dictRelMapper = Mockito.mock(DishDictMapper.class);
         dishIngMapper = Mockito.mock(DishIngredientMapper.class);
         ingredientNutritionMapper = Mockito.mock(IngredientNutritionMapper.class);
-        svc = new DishService(stepMapper, dictRelMapper, dishIngMapper, ingredientNutritionMapper, new NutritionCalcService(), null);
+        ingredientMapper = Mockito.mock(IngredientMapper.class);
+        svc = new DishService(stepMapper, dictRelMapper, dishIngMapper, ingredientNutritionMapper, ingredientMapper, new NutritionCalcService(), null);
         injectBaseMapper(svc, dishMapper);
     }
 
@@ -167,6 +171,50 @@ class DishServiceTest {
         assertThat(page.getRecords()).extracting(Dish::getName).containsExactly("菜3", "菜4");
     }
 
+    /** 详情：ingredients 里的 ingredientName 应被批量回填（一次 selectBatchIds，无 N+1）。 */
+    @Test
+    void 详情_食材名批量回填() {
+        long dishId = 1L;
+        when(dishMapper.selectById(dishId)).thenReturn(dish(dishId, "番茄炒蛋"));
+        when(dishIngMapper.selectList(any())).thenReturn(List.of(
+                di(10L, bd("200")),  // 番茄 200g
+                di(20L, bd("100"))   // 鸡蛋 100g
+        ));
+        when(dictRelMapper.selectList(any())).thenReturn(List.of());
+        when(stepMapper.selectList(any())).thenReturn(List.of());
+        // 一次批量查回两个食材名
+        when(ingredientMapper.selectBatchIds(any())).thenReturn(List.of(
+                ingredient(10L, "番茄"),
+                ingredient(20L, "鸡蛋")
+        ));
+
+        DishService.DishDetail detail = svc.detail(dishId);
+
+        assertThat(detail.ingredients()).hasSize(2);
+        assertThat(detail.ingredients()).extracting(DishIngredient::getIngredientName)
+                .containsExactlyInAnyOrder("番茄", "鸡蛋");
+        assertThat(detail.ingredients()).extracting(DishIngredient::getAmount)
+                .containsExactlyInAnyOrder(bd("200"), bd("100"));
+        // 关键：只查了一次 ingredient 表（批量），不是逐个查
+        Mockito.verify(ingredientMapper, Mockito.times(1)).selectBatchIds(any());
+    }
+
+    /** 详情：食材被软删（查不到名）时 ingredientName 落 null，不报错。 */
+    @Test
+    void 详情_食材查不到名时为null不报错() {
+        long dishId = 1L;
+        when(dishMapper.selectById(dishId)).thenReturn(dish(dishId, "孤儿菜"));
+        when(dishIngMapper.selectList(any())).thenReturn(List.of(di(99L, bd("50"))));
+        when(dictRelMapper.selectList(any())).thenReturn(List.of());
+        when(stepMapper.selectList(any())).thenReturn(List.of());
+        when(ingredientMapper.selectBatchIds(any())).thenReturn(List.of()); // 食材全删了
+
+        DishService.DishDetail detail = svc.detail(dishId);
+
+        assertThat(detail.ingredients()).hasSize(1);
+        assertThat(detail.ingredients().get(0).getIngredientName()).isNull();
+    }
+
     private static BigDecimal bd(String s) { return new BigDecimal(s); }
 
     private Dish dish(long id, String name) {
@@ -181,6 +229,13 @@ class DishServiceTest {
         di.setIngredientId(ingId);
         di.setAmount(grams);
         return di;
+    }
+
+    private static Ingredient ingredient(long id, String name) {
+        Ingredient ing = new Ingredient();
+        ing.setId(id);
+        ing.setName(name);
+        return ing;
     }
 
     private static IngredientNutrition nut(long metricId, BigDecimal value) {

@@ -1,11 +1,15 @@
-# 咕嘟小食单 · 测试环境一键部署（内网，HTTP）
+# ⚠️ 已废弃 — 测试环境已从内网 192.168.100.248 迁移到腾讯云 49.232.3.201。
+# 请使用 docker-compose.staging.yml 代替。
+# 本文件保留作为历史参考，后续可删除。
+#
+# 咕嘟小食单 · 测试环境一键部署（内网，HTTP）【已废弃】
 # ============================================================
 # 与生产 docker-compose.prod.yml 的区别：
 #   - 测试环境不要 HTTPS，故无 front-nginx / certbot
 #   - menu-admin 直接映射 8080→80，作为唯一对外入口
 #   - mysql / redis / menu-api 与生产一致，复用同一份 application-prod.yml
 #
-# 部署（测试环境 192.168.100.248:/home/claude/gudu-deploy/）：
+# 部署（旧内网 192.168.100.248:/home/claude/gudu-deploy/）：
 #   sudo docker compose --project-directory /home/claude/gudu-deploy \
 #     -f docker-compose.test.yml up -d --build
 #
@@ -43,8 +47,12 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       TZ: Asia/Shanghai
-      API_KEY: ${API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-${API_KEY:-}}
+      GLM_API_KEY: ${GLM_API_KEY:-}
+      GUDU_AI_PROVIDER: ${GUDU_AI_PROVIDER:-deepseek}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      # 测试环境上传目录隔离：覆写 gudu.upload-dir 为 /app/uploads/test
+      SPRING_APPLICATION_JSON: '{"gudu":{"upload-dir":"/app/uploads/test"}}'
     volumes:
       - uploads:/app/uploads
       - ./logs:/app/logs
@@ -54,7 +62,7 @@ services:
     container_name: menu-admin
     restart: unless-stopped
     ports:
-      - "8080:80"   # 测试环境唯一对外入口：http://192.168.100.248:8080
+      - "8080:80"   # 旧测试环境唯一对外入口：http://192.168.100.248:8080 【已废弃】
     depends_on:
       - menu-api
 

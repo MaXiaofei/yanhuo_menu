@@ -58,6 +58,9 @@ class GuduE2EFlowTest {
     private static final long UNIT_G = 20L;             // g
     private static final long CAT_VEGETABLE = 24L;      // 蔬菜
 
+    /** 后端 context-path 前缀（application.yml: server.servlet.context-path=/gudu）。TestRestTemplate 走真 Tomcat，必须带。 */
+    private static final String CTX = "/gudu";
+
     /** 每个测试前真登录拿新 token（Sa-Token token-style=uuid，登录即发新券）。 */
     private String loginAdmin() {
         Map<String, String> body = new HashMap<>();
@@ -470,7 +473,7 @@ class GuduE2EFlowTest {
         if (token != null) h.set("Authorization", token);
         try {
             String json = body == null ? "" : om.writeValueAsString(body);
-            ResponseEntity<String> resp = http.exchange(path, HttpMethod.POST,
+            ResponseEntity<String> resp = http.exchange(CTX + path, HttpMethod.POST,
                     new HttpEntity<>(json, h), String.class);
             return om.readTree(resp.getBody());
         } catch (Exception e) {
@@ -488,7 +491,7 @@ class GuduE2EFlowTest {
         HttpHeaders h = new HttpHeaders();
         if (token != null) h.set("Authorization", token);
         try {
-            ResponseEntity<String> resp = http.exchange(path, HttpMethod.GET,
+            ResponseEntity<String> resp = http.exchange(CTX + path, HttpMethod.GET,
                     new HttpEntity<>(h), String.class);
             return om.readTree(resp.getBody());
         } catch (Exception e) {
@@ -503,7 +506,7 @@ class GuduE2EFlowTest {
         if (token != null) h.set("Authorization", token);
         try {
             String json = body == null ? "" : om.writeValueAsString(body);
-            ResponseEntity<String> resp = http.exchange(path, HttpMethod.PUT,
+            ResponseEntity<String> resp = http.exchange(CTX + path, HttpMethod.PUT,
                     new HttpEntity<>(json, h), String.class);
             return om.readTree(resp.getBody());
         } catch (Exception e) {
@@ -516,7 +519,7 @@ class GuduE2EFlowTest {
         HttpHeaders h = new HttpHeaders();
         if (token != null) h.set("Authorization", token);
         try {
-            ResponseEntity<String> resp = http.exchange(path, HttpMethod.DELETE,
+            ResponseEntity<String> resp = http.exchange(CTX + path, HttpMethod.DELETE,
                     new HttpEntity<>(h), String.class);
             return om.readTree(resp.getBody());
         } catch (Exception e) {

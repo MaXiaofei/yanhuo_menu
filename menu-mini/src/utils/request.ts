@@ -1,4 +1,4 @@
-const BASE = '/api' // H5 走 vite proxy；小程序/真机改成 http://<host>:8080
+export const BASE = '/gudu' // H5 走 vite proxy；小程序/真机改成 http://<host>:8080/gudu
 
 export function getToken(): string {
   return uni.getStorageSync('token') || ''

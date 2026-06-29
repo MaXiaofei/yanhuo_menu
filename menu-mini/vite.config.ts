@@ -6,10 +6,10 @@ export default defineConfig({
   plugins: [uni()],
   server: {
     proxy: {
-      '/api': {
+      '/gudu': {
         target: 'http://localhost:8080',
         changeOrigin: true,
-        rewrite: (p: string) => p.replace(/^\/api/, '')
+        // 后端 context-path=/gudu，直接透传，无需 rewrite
       }
     }
   }

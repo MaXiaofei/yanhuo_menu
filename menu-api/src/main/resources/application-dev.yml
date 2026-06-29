@@ -1,7 +1,8 @@
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://192.168.100.248:3306/gudu?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8&allowPublicKeyRetrieval=true
+    # 本地开发连腾讯云测试库（staging 对外端口 13306，与生产 3306 错开）
+    url: jdbc:mysql://49.232.3.201:13306/gudu?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8&allowPublicKeyRetrieval=true
     username: root
     password: ${MYSQL_ROOT_PASSWORD:}
     type: com.zaxxer.hikari.HikariDataSource
@@ -15,15 +16,19 @@ spring:
 
   data:
     redis:
-      host: 192.168.100.248
-      port: 6379
+      host: 49.232.3.201
+      port: 16379
       database: 0
       timeout: 3000ms
 
 gudu:
   ai:
-    provider: ${YANHUO_AI_PROVIDER:deepseek}
+    provider: ${GUDU_AI_PROVIDER:deepseek}
     deepseek:
       base-url: https://api.deepseek.com/v1
       model: deepseek-chat
-      key: ${API_KEY:}
+      key: ${DEEPSEEK_API_KEY:${API_KEY:}}   # 兼容：优先 DEEPSEEK_API_KEY，回退 API_KEY
+    glm:
+      base-url: https://open.bigmodel.cn/api/paas/v4
+      model: glm-4-plus
+      key: ${GLM_API_KEY:}

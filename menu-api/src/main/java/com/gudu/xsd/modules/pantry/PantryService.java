@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.gudu.xsd.common.BizException;
 import com.gudu.xsd.common.PageQuery;
 import com.gudu.xsd.modules.dict.SysDict;
 import com.gudu.xsd.modules.dict.mapper.DictMapper;
@@ -151,5 +152,94 @@ public class PantryService extends ServiceImpl<PantryMapper, Pantry> {
     private Map<Long, String> unitNameMap() {
         return dictMapper.selectList(new QueryWrapper<SysDict>().eq("dict_group", "unit"))
                 .stream().collect(Collectors.toMap(SysDict::getId, SysDict::getName, (a, b) -> a));
+    }
+
+    // ===================== 扣减 =====================
+
+    /** 手动扣减库存：从指定 pantry 项扣除 amount，不低于 0。返回扣减后余量。 */
+    @org.springframework.transaction.annotation.Transactional
+    public BigDecimal deduct(Long id, BigDecimal amount) {
+        // 参数校验：id 非空
+        if (id == null) {
+            throw new BizException("库存项 id 不能为空");
+        }
+        // 参数校验：amount 非空且 > 0
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BizException("扣减数量必须大于 0");
+        }
+        Pantry p = getById(id);
+        if (p == null) {
+            throw new BizException("库存项不存在");
+        }
+        // 兜底：amount 字段可能为 null（脏数据）
+        BigDecimal current = p.getAmount() != null ? p.getAmount() : BigDecimal.ZERO;
+        BigDecimal remain = current.subtract(amount);
+        if (remain.compareTo(BigDecimal.ZERO) < 0) {
+            remain = BigDecimal.ZERO;
+        }
+        p.setAmount(remain);
+        updateById(p);
+        return remain;
+    }
+
+    // ===================== 批量添加 =====================
+
+    /** 批量添加库存：按名称匹配食材，未匹配则创建食材后关联。返回成功条数。 */
+    @org.springframework.transaction.annotation.Transactional
+    public int saveBatch(List<PantryController.BatchItem> items) {
+        // 参数校验：items 非空
+        if (items == null || items.isEmpty()) {
+            throw new BizException("采购内容不能为空");
+        }
+
+        // 预加载单位字典
+        Map<String, Long> unitNameToId = new HashMap<>();
+        if (dictMapper != null) {
+            List<SysDict> units = dictMapper.selectList(
+                    new QueryWrapper<SysDict>().eq("dict_group", "unit"));
+            for (SysDict d : units) unitNameToId.put(d.getName(), d.getId());
+        }
+
+        int count = 0;
+        for (PantryController.BatchItem item : items) {
+            if (item == null) continue;
+            if (item.getName() == null || item.getName().isBlank()) continue;
+            String name = item.getName().trim();
+
+            // 匹配已有食材
+            List<Ingredient> matched = ingredientMapper.selectList(
+                    new QueryWrapper<Ingredient>().eq("name", name).last("LIMIT 1"));
+            Long ingredientId;
+            if (!matched.isEmpty()) {
+                ingredientId = matched.get(0).getId();
+            } else {
+                Ingredient ing = new Ingredient();
+                ing.setName(name);
+                ingredientMapper.insert(ing);
+                ingredientId = ing.getId();
+            }
+
+            // 匹配单位：前端传优先，否则用 UnitMatcher 推断
+            String unitName = item.getUnit();
+            if (unitName == null || unitName.isBlank()) {
+                unitName = UnitMatcher.match(name);
+            }
+            Long unitId = unitNameToId.get(unitName);
+
+            Pantry p = new Pantry();
+            p.setIngredientId(ingredientId);
+            // 兜底：amount 为 null 时默认 1
+            p.setAmount(item.getAmount() != null && item.getAmount().compareTo(BigDecimal.ZERO) > 0
+                    ? item.getAmount() : BigDecimal.ONE);
+            p.setUnitId(unitId);
+            p.setExpireDate(item.getExpireDate());
+            save(p);
+            count++;
+        }
+
+        if (count == 0) {
+            throw new BizException("未识别到有效的食材项");
+        }
+        return count;
     }
 }

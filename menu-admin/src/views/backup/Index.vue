@@ -9,8 +9,8 @@ const fileRef = ref<File | null>(null)
 function onExport() {
   // 直接走浏览器下载：调用 /backup/export，拿到 JSON 文件
   // 通过隐藏 a 标签 + token 放 query 或 header（此处用 fetch 带 header）
-  const token = localStorage.getItem('yanhuo-token') || ''
-  fetch('/api/backup/export', {
+  const token = localStorage.getItem('gudu-token') || ''
+  fetch('/gudu/backup/export', {
     method: 'GET',
     headers: { Authorization: token },
   })
@@ -20,7 +20,7 @@ function onExport() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `yanhuo-backup-${new Date().toISOString().slice(0, 10)}.json`
+      a.download = `gudu-backup-${new Date().toISOString().slice(0, 10)}.json`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -72,23 +72,24 @@ async function onImport() {
       <div class="block">
         <h3>导入</h3>
         <p>选择之前导出的 JSON 文件恢复数据。</p>
-        <el-upload
-          :auto-upload="false"
-          :show-file-list="false"
-          accept="application/json"
-          :on-change="onFileChange"
-        >
-          <el-button>选择文件</el-button>
-        </el-upload>
-        <el-button
-          type="success"
-          style="margin-left: 12px"
-          :loading="importing"
-          :disabled="!fileRef"
-          @click="onImport"
-        >
-          开始导入
-        </el-button>
+        <div class="import-actions">
+          <el-upload
+            :auto-upload="false"
+            :show-file-list="false"
+            accept="application/json"
+            :on-change="onFileChange"
+          >
+            <el-button>选择文件</el-button>
+          </el-upload>
+          <el-button
+            type="success"
+            :loading="importing"
+            :disabled="!fileRef"
+            @click="onImport"
+          >
+            开始导入
+          </el-button>
+        </div>
       </div>
     </el-card>
   </div>
@@ -109,5 +110,13 @@ async function onImport() {
   margin: 0 0 12px;
   color: #7a6f60;
   font-size: 13px;
+}
+.import-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.import-actions :deep(.el-upload) {
+  display: inline-flex;
 }
 </style>

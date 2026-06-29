@@ -1,5 +1,7 @@
 server:
   port: 8080
+  servlet:
+    context-path: /gudu
 
 spring:
   profiles:
@@ -38,11 +40,17 @@ knife4j:
 gudu:
   upload-dir: uploads
   ai:
-    # AI provider：deepseek（默认，真调 DeepSeek，失败降级 mock）/ mock（规则表兜底）/ glm（预留空壳）
-    provider: ${YANHUO_AI_PROVIDER:deepseek}
+    # AI provider：deepseek（默认，真调 DeepSeek，失败降级 mock）/ glm（智谱 GLM）/ mock（规则表兜底）
+    # 启动初值；运行时可经 PUT /ai/provider 热切换（写 Redis，重启不丢）
+    provider: ${GUDU_AI_PROVIDER:deepseek}
     # 每 member 每日 AI 调用上限（scene 无关，防滥用；null/无 member 不限）
-    daily-limit: ${YANHUO_AI_DAILY_LIMIT:50}
+    daily-limit: ${GUDU_AI_DAILY_LIMIT:50}
     deepseek:
       base-url: https://api.deepseek.com/v1
       model: deepseek-chat
-      key: ${API_KEY:}   # 从环境变量 API_KEY 注入（.env.dev），不硬编码
+      # 优先 DEEPSEEK_API_KEY，回退老的 API_KEY（兼容已部署机器的 docker-compose.env）
+      key: ${DEEPSEEK_API_KEY:${API_KEY:}}
+    glm:
+      base-url: https://open.bigmodel.cn/api/paas/v4
+      model: glm-4-plus
+      key: ${GLM_API_KEY:}        # 从环境变量 GLM_API_KEY 注入，不硬编码

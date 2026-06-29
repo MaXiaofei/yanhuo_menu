@@ -12,9 +12,10 @@ export default defineConfig({
         host: '0.0.0.0',
         port: 5173,
         proxy: {
-            '/api': {
+            '/gudu': {
                 target: 'http://localhost:8080',
                 changeOrigin: true,
+                // 后端 context-path=/gudu，直接透传，无需 rewrite
             },
         },
     },

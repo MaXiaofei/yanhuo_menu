@@ -59,6 +59,23 @@
         </view>
       </view>
 
+      <!-- 食材 -->
+      <view class="block" v-if="ingredients.length">
+        <view class="block-title">
+          <view class="tbar"></view>
+          <text>食材</text>
+        </view>
+        <view class="yh-card ingredient-card">
+          <view class="ingredient-row" v-for="(ing, i) in ingredients" :key="i">
+            <text class="ing-name">{{ ing.ingredientName || '未知食材' }}</text>
+            <view class="ing-right">
+              <text class="ing-amount">{{ ing.amount }}</text>
+              <text class="ing-unit">g</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
       <!-- 做法 -->
       <view class="block">
         <view class="block-title">
@@ -112,6 +129,7 @@ const m = useMemberStore()
 const data = ref<any>(null)
 const dish = computed(() => data.value?.dish || null)
 const steps = computed(() => data.value?.steps || [])
+const ingredients = computed(() => data.value?.ingredients || [])
 
 const nutrition = ref<Record<string, any>>({})
 const metrics = ref<any[]>([])
@@ -179,7 +197,8 @@ function imgs(s: any): string[] {
 }
 function imgUrl(u: string): string {
   if (!u) return ''
-  return u.startsWith('http') ? u : '/api' + u
+  // 后端返回相对根的路径（如 /gudu/uploads/xxx），H5 经 vite proxy 透传到后端；真机直连已含 host
+  return u.startsWith('http') || u.startsWith('/gudu') ? u : '/gudu' + u
 }
 async function onMarkDone() {
   if (!m.currentId) {
@@ -337,6 +356,21 @@ function goBack() {
 .n-right { display: flex; align-items: baseline; gap: 6rpx; }
 .n-value { font-size: 32rpx; font-weight: bold; color: #FF8C42; }
 .n-unit { font-size: 22rpx; color: #9B958C; }
+
+/* 食材卡（复用营养卡视觉语言） */
+.ingredient-card { padding: 8rpx 32rpx; }
+.ingredient-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 0;
+  border-bottom: 2rpx solid #F2EDE4;
+}
+.ingredient-row:last-child { border-bottom: none; }
+.ing-name { font-size: 28rpx; color: #2D2A26; }
+.ing-right { display: flex; align-items: baseline; gap: 4rpx; }
+.ing-amount { font-size: 32rpx; font-weight: bold; color: #FF8C42; }
+.ing-unit { font-size: 22rpx; color: #9B958C; }
 
 /* 步骤卡 */
 .step-card { padding: 28rpx 32rpx; }

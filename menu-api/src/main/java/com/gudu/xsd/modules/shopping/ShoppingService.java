@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.gudu.xsd.common.BizException;
 import com.gudu.xsd.common.PageQuery;
 import com.gudu.xsd.modules.dict.SysDict;
 import com.gudu.xsd.modules.dict.mapper.DictMapper;
@@ -354,8 +355,6 @@ public class ShoppingService extends ServiceImpl<ShoppingListMapper, ShoppingLis
         removeById(listId);
     }
 
-    // ===================== 内部辅助 =====================
-
     /** 给 item 列表填中文展示名（食材名/单位名/品类名/采购单位名）。 */
     private List<ShoppingItemVO> fillVoNames(List<ShoppingItem> rows) {
         if (rows.isEmpty()) return new ArrayList<>();
@@ -392,5 +391,70 @@ public class ShoppingService extends ServiceImpl<ShoppingListMapper, ShoppingLis
             out.add(vo);
         }
         return out;
+    }
+
+    // ===================== 自定义文本生成 =====================
+
+    /**
+     * 从自由文本生成采购清单（纯 Java 解析，不依赖 AI）。
+     *
+     * <p>流程：文本解析 → 匹配食材库 → 按品类分区 → 落库。
+     * 文本中未能匹配食材库的项 → 存为 customName。
+     */
+    @Transactional
+    public Long generateFromText(String text) {
+        if (text == null || text.isBlank()) {
+            throw new BizException("请输入采购内容");
+        }
+
+        // 1. 解析文本
+        ShoppingTextParser parser = new ShoppingTextParser();
+        List<ShoppingTextParser.ParsedItem> parsed = parser.parse(text);
+        if (parsed.isEmpty()) {
+            throw new BizException("未识别到有效采购项，请按「名称 数量单位」格式输入");
+        }
+
+        // 2. 加载食材库（用于名称匹配），兜底空列表
+        List<Ingredient> all = ingredientMapper.selectList(null);
+        if (all == null) all = java.util.Collections.emptyList();
+        final List<Ingredient> finalAll = all;
+        List<ShoppingTextParser.IngredientRef> pool = all.stream()
+                .filter(i -> i != null && i.getName() != null)
+                .map(i -> new ShoppingTextParser.IngredientRef(i.getId(), i.getName(), i.getPurchaseCategoryId()))
+                .toList();
+
+        // 3. 创建采购单
+        ShoppingList list = new ShoppingList();
+        list.setTimeRange("custom_text");
+        list.setStartDate(LocalDate.now());
+        list.setEndDate(LocalDate.now());
+        save(list);
+
+        // 4. 逐项落库
+        for (ShoppingTextParser.ParsedItem pi : parsed) {
+            ShoppingItem item = new ShoppingItem();
+            item.setListId(list.getId());
+            item.setPurchased(0);
+            item.setReferenceGrams(pi.gramsEstimate());
+
+            Long matchedId = ShoppingTextParser.matchIngredient(pi.name(), pool);
+            if (matchedId != null) {
+                item.setIngredientId(matchedId);
+                // 带出食材的采购品类
+                for (ShoppingTextParser.IngredientRef ref : pool) {
+                    if (ref.id().equals(matchedId)) {
+                        item.setPurchaseCategoryId(ref.purchaseCategoryId());
+                        break;
+                    }
+                }
+                item.setCustomName(null);
+            } else {
+                item.setIngredientId(null);
+                item.setCustomName(pi.name());
+            }
+            itemMapper.insert(item);
+        }
+
+        return list.getId();
     }
 }

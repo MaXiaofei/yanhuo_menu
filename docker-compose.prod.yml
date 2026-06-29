@@ -36,7 +36,9 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       TZ: Asia/Shanghai
-      API_KEY: ${API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-${API_KEY:-}}
+      GLM_API_KEY: ${GLM_API_KEY:-}
+      GUDU_AI_PROVIDER: ${GUDU_AI_PROVIDER:-deepseek}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     volumes:
       - uploads:/app/uploads

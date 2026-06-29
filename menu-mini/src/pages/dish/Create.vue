@@ -5,6 +5,18 @@
       <u-input v-model="form.name" placeholder="如：番茄炒蛋" border="surround" />
     </view>
 
+    <!-- 封面图 -->
+    <view class="block">
+      <text class="label">封面图</text>
+      <u-upload
+        :fileList="coverImgs"
+        @afterRead="onCoverAdd"
+        @delete="onCoverDelete"
+        :maxCount="1"
+        :previewFullImage="true"
+      />
+    </view>
+
     <view class="block import-block">
       <text class="label">URL 导入（下厨房/美食杰/豆果）</text>
       <view class="import-row">
@@ -38,6 +50,13 @@
         <u-button size="mini" type="error" @click="steps.splice(i, 1)">删除</u-button>
       </view>
       <u-textarea v-model="s.text" :placeholder="`步骤 ${i + 1} 描述`" />
+      <u-upload
+        :fileList="s.localImgs"
+        @afterRead="onStepImgAdd(s, $event)"
+        @delete="onStepImgDelete(s, $event)"
+        :maxCount="3"
+        :previewFullImage="true"
+      />
     </view>
     <u-button @click="addStep">+ 添加步骤</u-button>
 
@@ -48,11 +67,14 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { saveDish, importDishByUrl } from '@/api/dish'
+import { uploadOne } from '@/api/upload'
 
-// dish 字段对齐后端 Dish 实体（name/note/prepTime/cookTime/difficulty/price）
-const form = reactive({ name: '', note: '', prepTime: '', cookTime: '', difficulty: '3', price: '' })
-// steps 字段对齐后端 DishStep 实体（seq/text/sortOrder/images）
-const steps = reactive<any[]>([{ text: '' }])
+// dish 字段对齐后端 Dish 实体（name/note/prepTime/cookTime/difficulty/price/coverUrl）
+const form = reactive({ name: '', note: '', prepTime: '', cookTime: '', difficulty: '3', price: '', coverUrl: '' })
+// 封面图本地预览（u-upload fileList）
+const coverImgs = ref<any[]>([])
+// 每步：{ text, imageUrls: string[], localImgs: any[] }
+const steps = reactive<any[]>([{ text: '', imageUrls: [], localImgs: [] }])
 const loading = ref(false)
 const importUrl = ref('')
 const importing = ref(false)
@@ -74,7 +96,55 @@ async function onImportUrl() {
   }
 }
 
-function addStep() { steps.push({ text: '' }) }
+function addStep() { steps.push({ text: '', imageUrls: [], localImgs: [] }) }
+
+// —— 封面图：选完即传，存 URL ——
+async function onCoverAdd(e: any) {
+  const files = e.file || (e.files ? e.files : [e.file])
+  if (!Array.isArray(files)) return
+  const f = files[0]
+  if (!f) return
+  coverImgs.value = [f] // 单张，覆盖
+  uni.showLoading({ title: '上传中…' })
+  try {
+    form.coverUrl = await uploadOne(f.url || f.path)
+  } catch {
+    uni.showToast({ title: '封面上传失败', icon: 'none' })
+    coverImgs.value = []
+  } finally {
+    uni.hideLoading()
+  }
+}
+function onCoverDelete() {
+  coverImgs.value = []
+  form.coverUrl = ''
+}
+
+// —— 步骤图：选完即传，存 URL ——
+async function onStepImgAdd(step: any, e: any) {
+  const files = e.file || (e.files ? e.files : [e.file])
+  if (!Array.isArray(files)) return
+  step.localImgs = step.localImgs || []
+  step.imageUrls = step.imageUrls || []
+  uni.showLoading({ title: '上传中…' })
+  try {
+    for (const f of files) {
+      step.localImgs.push(f)
+      const url = await uploadOne(f.url || f.path)
+      step.imageUrls.push(url)
+    }
+  } catch {
+    uni.showToast({ title: '步骤图上传失败', icon: 'none' })
+  } finally {
+    uni.hideLoading()
+  }
+}
+function onStepImgDelete(step: any, e: any) {
+  step.localImgs = step.localImgs || []
+  step.imageUrls = step.imageUrls || []
+  step.localImgs.splice(e.index, 1)
+  step.imageUrls.splice(e.index, 1)
+}
 
 async function onSave() {
   if (!form.name.trim()) {
@@ -88,6 +158,7 @@ async function onSave() {
       dish: {
         name: form.name,
         note: form.note || null,
+        coverUrl: form.coverUrl || null,
         prepTime: form.prepTime ? Number(form.prepTime) : null,
         cookTime: form.cookTime ? Number(form.cookTime) : null,
         difficulty: form.difficulty ? Number(form.difficulty) : null,
@@ -95,7 +166,8 @@ async function onSave() {
       },
       steps: steps
         .filter(s => s.text && s.text.trim())
-        .map((s, i) => ({ seq: i + 1, text: s.text, sortOrder: i + 1 }))
+        // DishStep.images 约定为逗号分隔 URL
+        .map((s, i) => ({ seq: i + 1, text: s.text, images: (s.imageUrls || []).join(','), sortOrder: i + 1 }))
     }
     await saveDish(payload)
     uni.showToast({ title: '已保存' })

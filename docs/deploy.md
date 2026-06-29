@@ -6,74 +6,110 @@
 
 | 环境 | 位置 | 用途 | 访问地址 | 项目目录 | 部署方式 |
 |------|------|------|----------|----------|----------|
-| **测试环境** | 内网服务器 `192.168.100.248` | 日常部署验证、联调 | `http://192.168.100.248:8080` | `/home/john/gudu-deploy/` | `docker compose -f docker-compose.test.yml up -d --build` |
+| **测试环境** | 腾讯云 `49.232.3.201`（与生产同机） | 日常部署验证、联调 | `http://49.232.3.201:9090` | `/root/gudu-staging/` | `docker compose -p gudu-staging -f docker-compose.staging.yml up -d --build` |
 | **生产环境** | 腾讯云 `49.232.3.201` | 正式上线 | **http://49.232.3.201** | `/root/gudu/` | `docker compose -f docker-compose.prod.yml up -d --build` |
 
-> **部署规则**：说「部署到测试」→ 部署到内网 `192.168.100.248`；说「上生产」→ 才部署到腾讯云 `49.232.3.201`。
->
+> **部署规则**：说「部署到测试」→ 部署到 `/root/gudu-staging/`；说「上生产」→ 部署到 `/root/gudu/`。两者在同一台服务器，但通过**独立 project/网络/容器名/端口**完全隔离（见下）。
+
 > **数据库规则**：两套环境都**保留现有数据，不清库**。除非明确说「清库」并经二次确认，否则禁止 `down -v` 或 DROP DATABASE。
 
-> 两套环境都通过 `docker-compose.prod.yml` 编排，区别在连接信息和部署目录。
+> **⚠️ compose 文件区分**：测试用 **`docker-compose.staging.yml`**（HTTP，独立 project=gudu-staging，menu-admin 直挂 9090，无 front-nginx/certbot）；生产用 **`docker-compose.prod.yml`**（HTTPS，front-nginx + certbot，80/443）。两者 mysql/redis/menu-api 用各自的网络与卷，**互不影响**，一套 down 不影响另一套。
 
-> **⚠️ compose 文件区分**：测试环境用 **`docker-compose.test.yml`**（HTTP，menu-admin 直挂 8080，无 front-nginx/certbot）；生产用 **`docker-compose.prod.yml`**（HTTPS，front-nginx + certbot）。两者 mysql/redis/menu-api 的 service 名与卷名严格一致（`gudu-deploy_mysql-data`），切换时不重建卷、不丢数据。**测试环境宿主机的 80 端口被原生 nginx 占用，不能用 prod.yml。**
+> **⚠️ 同机隔离要点**（测试与生产在同一台 49.232.3.201）：
+> | 维度 | 生产 | 测试 | 冲突 |
+> |------|------|------|------|
+> | project name | `gudu`（目录名） | `gudu-staging`（`-p` 指定） | ✅ 错开 |
+> | Docker 网络 | `gudu_default` | `gudu-staging_net`（显式命名） | ✅ 错开 |
+> | 容器名 | `*-prod` / `gudu-nginx` 等 | `*-staging` | ✅ 错开 |
+> | 数据卷 | `gudu_mysql-data` | `gudu-staging_mysql-data` | ✅ project 前缀天然隔离 |
+> | 宿主端口 | 80/443/3306/6379 | 9090/13306/16379 | ✅ 全错开 |
+> ⭐ menu-api 通过 service name（`gudu-mysql`/`gudu-redis`）连库，service name 解析依赖所在 Docker 网络。两套环境网络隔离，故同一份镜像、同一份 `application-prod.yml` 可零改动跑两套，各自连各自网络的 db。
 
 > **密钥/口令**统一放 `.env.dev`（本地、已被 `.gitignore` 忽略），本文档不写明文密钥。
+>
+> ### .env 文件管理规则（重要）
+> | 文件 | 位置 | 用途 | git |
+> |------|------|------|-----|
+> | `.env.example` | 项目根 | 变量模板，全部 `<>` 占位符，**绝无真实值** | ✅ 提交 |
+> | `.env.dev` | 项目根（本地 Mac） | 真实密钥/密码，运维脚本从此读取 | ❌ gitignore |
+> | `.env` | 服务器 `/root/gudu/.env` | **唯一共享真相源**，含生产+测试全部变量 | ❌ 服务器 |
+>
+> **服务器上**：`/root/gudu/.env` 是唯一环境变量文件，`/root/gudu-staging/.env` 是它的软链接。两个 docker compose 各自通过本目录的 `.env`（或链接）读取同一份变量。禁止在服务器创建独立的 `.env` 副本。
+>
+> **本地 `.env.dev`**：必须与服务器 `/root/gudu/.env` 保持一致（变量名和值），新增变量两边同步。`.env.example` 同步新增变量的占位符。
 
 ---
 
-## 一、测试环境（内网）
+## 一、测试环境（与生产同机隔离）
 
 ### 1.1 服务器信息
 
 | 项目 | 值 |
 |------|-----|
-| 内网 IP | `192.168.100.248` |
-| 主机名 | `home-fn` |
-| SSH 用户 | `john`（属 Administrators 组，可 sudo；**已在 docker 组**，docker 命令免 sudo） |
-| 系统架构 | x86_64 |
-| Docker | 28.5.2 / Compose v2.40.3 |
-| 项目目录 | `/home/john/gudu-deploy/`（属主 `john`，直接读写，免 sudo） |
-| 备份目录 | `/home/john/gudu-deploy/backups/` |
-| 数据卷 | `gudu-deploy_mysql-data`（**保留，不清库**） |
-| ⚠️ 网络 | **无外网**，docker build 无法拉取新基础镜像（见下方说明） |
+| 公网 IP | `49.232.3.201`（与生产同机） |
+| 系统 | CentOS Linux 7 (Core) |
+| 架构 | x86_64 |
+| SSH 用户 | `root`（密码见 `.env.dev` 的 `STAGING_SSH_PASS`，与生产同机同账号） |
+| 项目目录 | `/root/gudu-staging/`（**独立于生产 `/root/gudu/`**） |
+| 备份目录 | `/root/gudu-staging/backups/` |
+| 数据卷 | `gudu-staging_mysql-data`（**全新空库，与生产卷 `gudu-deploy_mysql-data` 隔离**） |
+| 网络 | 与生产服务器一致（腾讯云，有外网，docker build 正常） |
 
 ### 1.2 容器与端口
 
-| 容器 | 端口(宿主机) | 说明 |
+| 容器（container_name） | 端口(宿主机) | 说明 |
 |------|--------------|------|
-| `menu-api` | 8080(容器内) | 后端，不直接暴露，经 nginx 代理 |
-| `menu-admin` | `8080->80` | 前端 Nginx（注意：测试环境前端走 8080，非 80） |
-| `gudu-mysql` | `3306` | MySQL 8.0，库 `gudu`，密码见 `.env` |
-| `gudu-redis` | `6379` | Redis 7 |
+| `menu-api-staging` | 8080(容器内) | 后端，仅 staging-net 内可达，经 nginx 代理 |
+| `menu-admin-staging` | `9090->80` | 前端 Nginx（测试后台入口：http://49.232.3.201:9090） |
+| `menu-mini-staging` | `9091->80` | 小程序 H5（测试小程序入口：http://49.232.3.201:9091） |
+| `gudu-mysql-staging` | `13306->3306` | MySQL 8.0，库 `gudu`，密码见 `.env`（与生产隔离） |
+| `gudu-redis-staging` | `16379->6379` | Redis 7（与生产隔离） |
 
-> 测试环境**未配置 HTTPS**（无 certbot），走 HTTP。`menu-api` 的 `API_KEY` 当前为空，AI 功能降级为 mock（这是测试环境既定状态）。
+> 测试环境**未配置 HTTPS**（无 certbot），走 HTTP。`GUDU_AI_PROVIDER` 默认 `mock`（测试环境既定状态，不烧 key；如需真实 AI，配 `STAGING_DEEPSEEK_API_KEY` 并改 `STAGING_AI_PROVIDER`）。
+>
+> ⚠️ 所有端口与生产（80/443/3306/6379）错开，互不冲突。容器名统一带 `-staging` 后缀，与生产的 `-prod`/无后缀容器名全局唯一。
 
 ### 1.3 SSH 连接与部署
 
-john 可直接 SSH（密码见 `.env.dev` 的 `SSH_PASS`/`SSH_HOST`）：
+root 直接 SSH（密码见 `.env.dev`）：
 ```bash
-ssh john@192.168.100.248
-```
-john 已在 docker 组，部署目录在自己家下，**docker 命令免 sudo、可直接 cd**：
-```bash
-cd /home/john/gudu-deploy
-docker compose -f docker-compose.test.yml ps
-docker compose -f docker-compose.test.yml up -d --build
+ssh root@49.232.3.201
 ```
 
-### 1.4 ⚠️ 网络限制（无外网）
+部署（**注意 `-p gudu-staging` 必须带，否则卷名/网络会与生产冲突**）：
+```bash
+cd /root/gudu-staging
+docker compose -p gudu-staging -f docker-compose.staging.yml ps
+docker compose -p gudu-staging -f docker-compose.staging.yml up -d --build
+```
 
-测试服务器**无外网访问**，影响 docker 构建：
-- ✅ 现有基础镜像（`mysql:8.0`/`redis:7`/`maven:...`/`nginx:alpine`）已缓存，可正常 build
-- ❌ **缺** `eclipse-temurin:17-jre`（menu-api 运行时）、`node:20-alpine`（menu-admin 构建），需要 `--no-cache` 重建时会因拉不到镜像而失败
-- **应对**：基础镜像缺失时，需先从有外网的机器 `docker save` 导出 → 传到服务器 `docker load` 导入
+### 1.4 与生产的隔离验证
 
-### 1.4 数据库现状（部署前核查，2026-06-27）
+部署后建议执行以下命令确认隔离生效（生产容器不应出现在 staging 网络，反之亦然）：
+```bash
+# 1. 容器名隔离：应看到 *-staging 一组，*-prod / gudu-nginx 另一组，无重名
+docker ps --format '{{.Names}}\t{{.Ports}}' | grep -E 'gudu|menu'
 
-`yanhuo` 库 27 张表，已有真实测试数据：
-- `dish` 18 条 / `member` 6 条 / `ingredient` 445 条 / `menu` 3 条
+# 2. 网络隔离：staging 网络里只有 *-staging 容器
+docker network inspect gudu-staging_net --format '{{range .Containers}}{{.Name}} {{end}}'
+docker network inspect gudu-deploy_default --format '{{range .Containers}}{{.Name}} {{end}}'
 
-部署**只重建应用容器，不动数据卷**。
+# 3. 卷隔离：两个独立的 mysql-data 卷
+docker volume ls | grep mysql-data
+```
+
+### 1.5 数据库现状
+
+测试环境为**全新空库**（独立卷 `gudu-staging_mysql-data`），首启自动执行 `./menu-api/sql/V01~V30` 初始化表结构 + demo 数据。与生产数据完全隔离，可随意清库（`docker compose -p gudu-staging -f docker-compose.staging.yml down -v` 后重启即重建）。
+
+### 1.6 ⚠️ 腾讯云安全组
+
+测试环境对外用 9090 端口，需在**腾讯云控制台 → 安全组入站规则**放行：
+| 协议 | 端口 | 来源 | 说明 |
+|------|------|------|------|
+| TCP | 9090 | 0.0.0.0/0 或限定来源 IP | 测试环境前端入口 |
+
+> MySQL(13306)/Redis(16379) 仅容器间通信，**不建议放行公网**；如需本地工具连测试库排查，临时放行并限定来源 IP。
 
 ---
 
@@ -262,14 +298,33 @@ server {
 > 真实密钥见 `.env.dev`（本地，已被 `.gitignore` 忽略）。生产 `/root/yanhuo/.env` 示例：
 
 ```bash
-API_KEY=<DeepSeek API Key,见 .env.dev>
-YANHUO_AI_PROVIDER=deepseek
+DEEPSEEK_API_KEY=<DeepSeek API Key,见 .env.dev>
+GLM_API_KEY=<智谱 GLM API Key,可选>
+GUDU_AI_PROVIDER=deepseek
 ```
 
 | 变量 | 说明 | 必填 |
 |------|------|------|
-| `API_KEY` | DeepSeek API Key（AI 功能） | 是 |
-| `YANHUO_AI_PROVIDER` | AI 提供商，默认 deepseek | 否 |
+| `DEEPSEEK_API_KEY` | DeepSeek API Key（provider=deepseek 时需配） | 否* |
+| `GLM_API_KEY` | 智谱 GLM API Key（provider=glm 时需配） | 否* |
+| `GUDU_AI_PROVIDER` | AI 提供商启动初值：deepseek(默认)/glm/mock | 否 |
+
+\* 选哪个 provider 就配哪个 key；都不配则 provider 会降级 mock（规则表兜底）。
+key 未配时该 provider 标记为未就绪（`GET /ai/provider` 的 `ready=false`），但仍可被选中——调用时自动降级 mock。
+
+> **变量名兼容**：DeepSeek key 推荐用 `DEEPSEEK_API_KEY`。若旧部署机器仍写 `API_KEY`，
+> docker-compose 与 yml 已做回退兼容（`${DEEPSEEK_API_KEY:-${API_KEY:-}}`），新老名都能识别，无需立即改部署机。
+
+> **运行时热切换（无需重启）**：除改 `.env` 重建容器外，也可在线切换并立即生效：
+> ```bash
+> # 查看当前 provider + 各 provider 就绪状态
+> curl http://<host>:8080/gudu/ai/provider -H "Authorization: <sa-token>"
+> # 切到 glm（写 Redis，重启不丢）
+> curl -X PUT http://<host>:8080/gudu/ai/provider \
+>   -H "Authorization: <sa-token>" -H "Content-Type: application/json" \
+>   -d '{"provider":"glm"}'
+> ```
+> `GUDU_AI_PROVIDER` 是启动初值；一旦经接口切过，选择状态存 Redis，重启后以 Redis 为准。
 
 > **注意**：修改 `.env` 后需重建容器才能生效（`docker compose up -d` 即可读取新值，但 menu-api 需重新创建）。
 
@@ -532,8 +587,9 @@ sshpass -p '<密码>' rsync -avz \
 ```bash
 # 在服务器上
 cat > /root/yanhuo/.env << 'EOF'
-API_KEY=<DeepSeek API Key,见 .env.dev>
-YANHUO_AI_PROVIDER=deepseek
+DEEPSEEK_API_KEY=<DeepSeek API Key,见 .env.dev>
+GLM_API_KEY=<智谱 GLM API Key,可选>
+GUDU_AI_PROVIDER=deepseek
 EOF
 ```
 
@@ -566,7 +622,7 @@ docker logs menu-api | grep "Started"
 
 # 本地测试
 curl http://localhost/
-curl http://localhost/api/
+curl http://localhost/gudu/auth/login -i
 
 # 公网测试
 curl http://49.232.3.201/
@@ -574,19 +630,117 @@ curl http://49.232.3.201/
 
 ---
 
-### 2.10 常见问题
+### 2.10 把测试环境迁移到生产服务器（同机隔离）
+
+测试环境已从内网 `192.168.100.248` 迁移到生产服务器 `49.232.3.201`，与生产通过独立 project/网络/容器名/端口完全隔离。以下是一次性迁移操作：
+
+#### Step 1：同步代码到生产服务器的新目录（本地 Mac 执行）
+
+```bash
+# rsync 到新目录，绝不碰生产 /root/gudu/
+sshpass -p '<生产SSH密码,见.env.dev>' rsync -avz \
+  --exclude='node_modules' --exclude='target' --exclude='.git' \
+  --exclude='menu-flutter' --exclude='.idea' --exclude='.claude' \
+  --exclude='.env' --exclude='.env.dev' --exclude='logs' \
+  -e 'ssh -o StrictHostKeyChecking=no' \
+  /Users/maxiaofei/mygithub/menu-new/ \
+  root@49.232.3.201:/root/gudu-staging/
+```
+
+#### Step 2：配置测试环境变量
+
+```bash
+ssh root@49.232.3.201
+cd /root/gudu-staging
+cat > .env <<'EOF'
+STAGING_MYSQL_ROOT_PASSWORD=<测试库密码,建议与生产不同>
+STAGING_AI_PROVIDER=mock
+# 如需真实 AI，取消下面注释：
+# STAGING_DEEPSEEK_API_KEY=<key>
+# STAGING_AI_PROVIDER=deepseek
+EOF
+```
+
+#### Step 3：启动测试环境（全新空库自动初始化）
+
+```bash
+cd /root/gudu-staging
+docker compose -p gudu-staging -f docker-compose.staging.yml up -d --build
+
+# 等待 mysql 初始化 + menu-api 启动（看到 "Started ... in Xs"）
+docker compose -p gudu-staging -f docker-compose.staging.yml logs -f menu-api | grep -m1 "Started"
+```
+
+#### Step 4：腾讯云安全组放行 9090
+
+在**腾讯云控制台 → 安全组**入站规则加：
+
+| 协议 | 端口 | 来源 | 说明 |
+|------|------|------|------|
+| TCP | 9090 | 0.0.0.0/0 或限定来源 IP | 测试环境前端入口 |
+
+#### Step 5：验证（关键验证点）
+
+```bash
+# 1. context-path 生效（应返回 405/JSON，非 404）
+curl http://localhost:9090/gudu/auth/login -i
+
+# 2. 容器名隔离正确（*-staging 与生产容器并存，无重名）
+docker ps --format '{{.Names}}' | grep -E 'gudu|menu'
+
+# 3. 网络隔离（staging 网络里只有 *-staging 容器）
+docker network inspect gudu-staging_net --format '{{range .Containers}}{{.Name}} {{end}}'
+
+# 4. 卷隔离（两个独立 mysql-data 卷）
+docker volume ls | grep mysql-data
+
+# 5. 浏览器访问 http://49.232.3.201:9090，登录 admin + 上传图片显示正常
+```
+
+#### Step 6：停掉旧测试机（迁移收尾）
+
+确认腾讯云测试环境正常后，停掉内网旧测试机：
+```bash
+ssh john@192.168.100.248
+cd /home/john/gudu-deploy
+docker compose -f docker-compose.test.yml down   # 停容器，保留卷以防万一
+# 如确认彻底不再用：docker compose -f docker-compose.test.yml down -v
+```
+
+#### 日常更新测试环境代码
+
+```bash
+# 本地 Mac rsync + 服务器重建（只重建应用容器，不动 mysql/redis）
+sshpass -p '<生产SSH密码>' rsync -avz \
+  --exclude='node_modules' --exclude='target' --exclude='.git' \
+  --exclude='menu-flutter' --exclude='.idea' --exclude='.claude' \
+  --exclude='.env' --exclude='.env.dev' --exclude='logs' \
+  -e 'ssh -o StrictHostKeyChecking=no' \
+  /Users/maxiaofei/mygithub/menu-new/ \
+  root@49.232.3.201:/root/gudu-staging/
+
+ssh root@49.232.3.201 \
+  'cd /root/gudu-staging && docker compose -p gudu-staging -f docker-compose.staging.yml up -d --build menu-api menu-admin'
+```
+
+---
+
+### 2.11 常见问题
 
 #### Q：容器启动失败？
 ```bash
-docker compose -f docker-compose.prod.yml logs   # 查看错误日志
+# 生产
+docker compose -f docker-compose.prod.yml logs
+# 测试
+docker compose -p gudu-staging -f docker-compose.staging.yml logs
 docker ps -a                                      # 查看退出容器
 ```
 
 #### Q：数据库连接失败？
-确认 `menu-api` 的 `application-prod.yml` 中数据库地址使用了容器名 `yanhuo-mysql`（非 IP）。
+确认 `menu-api` 的 `application-prod.yml` 中数据库地址使用了容器 service name `gudu-mysql`（非 IP，非旧名 `yanhuo-mysql`）。容器间靠 Docker 网络解析 service name，测试/生产各自在自己的网络里解析到各自的 db。
 
-#### Q：镜像拉取太慢？
-检查 `/etc/docker/daemon.json` 中的镜像加速配置，`systemctl restart docker` 后重试。
+#### Q：测试与生产端口冲突？
+测试用 9090/13306/16379，生产用 80/443/3306/6379，已全部错开。若仍冲突，检查是否有遗留容器：`docker ps -a | grep -E '3306|6379|9090'`。
 
 #### Q：端口被占用？
 ```bash

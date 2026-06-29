@@ -4,6 +4,9 @@
     <view class="greeting">
       <view class="g-row">
         <text class="g-hi">{{ greeting }}，{{ memberName }}</text>
+        <view class="g-switch" @click="onSwitchMember">
+          <text class="g-chip">{{ currentMemberName }} ▾</text>
+        </view>
       </view>
       <text class="g-quote">{{ todayQuote }}</text>
     </view>
@@ -67,6 +70,12 @@ const m = useMemberStore()
 const memberName = computed(() => {
   const cur = m.members.find((x: any) => x.id === m.currentId)
   return cur?.name || '掌勺人'
+})
+
+// 右上角成员切换 chip：明确反映「当前为谁」/「未选」
+const currentMemberName = computed(() => {
+  const cur = m.members.find((x: any) => x.id === m.currentId)
+  return cur?.name || '选就餐人'
 })
 
 const greeting = computed(() => {

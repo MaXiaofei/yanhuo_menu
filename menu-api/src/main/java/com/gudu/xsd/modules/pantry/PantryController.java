@@ -7,7 +7,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+
+import lombok.Data;
 
 /**
  * 食材库存接口。范式照 mealplan/ingredient：返回 R<T>，@Tag 分组。
@@ -19,6 +24,26 @@ import java.util.List;
 public class PantryController {
 
     private final PantryService svc;
+
+    @Data
+    public static class BatchItem {
+        private String name;
+        private BigDecimal amount;
+        private String unit;
+        private LocalDate expireDate;
+    }
+
+    @Data
+    public static class DeductReq {
+        private BigDecimal amount;
+    }
+
+    /** 手动扣减库存 */
+    @PostMapping("/{id}/deduct")
+    public R<Map<String, Object>> deduct(@PathVariable Long id, @RequestBody DeductReq req) {
+        BigDecimal remain = svc.deduct(id, req.getAmount());
+        return R.ok(Map.of("remain", remain));
+    }
 
     /** 库存分页列表（后台管理用）。 */
     @GetMapping
@@ -43,6 +68,13 @@ public class PantryController {
     public R<Long> add(@RequestBody Pantry pantry) {
         svc.save(pantry);
         return R.ok(pantry.getId());
+    }
+
+    /** 批量添加：按名称匹配食材，未匹配则自动创建食材。返回成功条数。 */
+    @PostMapping("/batch")
+    public R<Map<String, Object>> batchAdd(@RequestBody List<BatchItem> items) {
+        int count = svc.saveBatch(items);
+        return R.ok(Map.of("count", count));
     }
 
     /** 更新库存。 */

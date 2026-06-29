@@ -301,7 +301,8 @@ function difficultyText(d?: number): string {
 }
 function imgUrl(u: string): string {
   if (!u) return ''
-  return u.startsWith('http') ? u : '/api' + u
+  // 后端返回相对根的路径（如 /gudu/uploads/xxx），H5 经 vite proxy 透传到后端；真机直连已含 host
+  return u.startsWith('http') || u.startsWith('/gudu') ? u : '/gudu' + u
 }
 function onCreate() {
   uni.showActionSheet({
