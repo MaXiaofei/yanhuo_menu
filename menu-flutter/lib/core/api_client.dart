@@ -46,7 +46,9 @@ class ApiClient {
           final api = ApiResponse.fromJson(body);
           if (api.code == 401) {
             token = null;
-            onUnauthorized?.call();
+            // 读实例字段（动态），而非 init 闭包捕获的局部参数——
+            // 这样 app 在 init 之后赋值的 onUnauthorized 才会生效（401→跳登录）。
+            this.onUnauthorized?.call();
             handler.reject(DioException(
               requestOptions: response.requestOptions,
               message: '未登录',
@@ -54,7 +56,7 @@ class ApiClient {
             return;
           }
           if (!api.ok) {
-            onErrorToast?.call(api.msg.isEmpty ? '请求失败' : api.msg);
+            this.onErrorToast?.call(api.msg.isEmpty ? '请求失败' : api.msg);
             handler.reject(DioException(
               requestOptions: response.requestOptions,
               message: api.msg,
@@ -74,7 +76,7 @@ class ApiClient {
                 e.type == DioExceptionType.sendTimeout ||
                 e.type == DioExceptionType.receiveTimeout ||
                 e.type == DioExceptionType.connectionError)) {
-          onErrorToast?.call('网络连接失败，请检查后端是否可达');
+          this.onErrorToast?.call('网络连接失败，请检查后端是否可达');
         }
         handler.next(e);
       },
